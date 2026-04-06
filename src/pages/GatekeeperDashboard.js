@@ -13,6 +13,7 @@ const GatekeeperDashboard = () => {
   const [token, setToken] = useState("");
   const [statusMsg, setStatusMsg] = useState("");
   const [reservation, setReservation] = useState(null);
+  const [nextAction, setNextAction] = useState(null);
   const [loading, setLoading] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState("");
@@ -27,31 +28,45 @@ const GatekeeperDashboard = () => {
     };
   }, []);
 
-  const validateToken = async (tokenToValidate) => {
-    const t = (tokenToValidate ?? token).trim();
-    if (!t) {
-      setStatusMsg("Please enter / paste the QR token or scan with camera.");
+  const parseBookingId = (raw) => {
+    const t = String(raw ?? "").trim();
+    const n = parseInt(t, 10);
+    return Number.isNaN(n) ? null : n;
+  };
+
+  const loadBooking = async (rawInput) => {
+    const bookingId = parseBookingId(rawInput);
+    if (bookingId == null) {
+      setStatusMsg("Please enter a valid booking ID (number from the QR).");
       return;
     }
 
     setLoading(true);
     setStatusMsg("Validating...");
     setReservation(null);
+    setNextAction(null);
     setCameraError("");
 
     try {
-      const res = await fetch(`${API_BASE}/gate/scan/${encodeURIComponent(t)}`);
+      const res = await fetch(`${API_BASE}/gate/booking/${bookingId}`);
       const data = await res.json();
 
       if (!data.ok) {
-        setStatusMsg(`❌ ${data.error || "Invalid QR"}`);
+        setStatusMsg(`❌ ${data.error || "Invalid booking"}`);
         setLoading(false);
         return;
       }
 
-      setToken(t);
+      setToken(String(bookingId));
       setReservation(data.reservation);
-      setStatusMsg("✅ Valid reservation. You can open the gate.");
+      setNextAction(data.nextAction);
+      setStatusMsg(
+        data.nextAction === "check-in"
+          ? "✅ Booking confirmed — you can check in (entry)."
+          : data.nextAction === "check-out"
+            ? "✅ Customer checked in — you can check out (exit)."
+            : "✅ Loaded booking."
+      );
     } catch (e) {
       setStatusMsg(`❌ ${e.message || "Cannot reach server"}`);
     } finally {
@@ -59,29 +74,58 @@ const GatekeeperDashboard = () => {
     }
   };
 
-  const openGate = async () => {
-    if (!reservation?.qr_token) return;
+  const doCheckIn = async () => {
+    const bookingId = parseBookingId(token);
+    if (bookingId == null) return;
 
     setLoading(true);
-    setStatusMsg("Opening gate...");
-
+    setStatusMsg("Checking in...");
     try {
-      const res = await fetch(`${API_BASE}/gate/open`, {
+      const res = await fetch(`${API_BASE}/gate/check-in`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: reservation.qr_token }),
+        body: JSON.stringify({ bookingId }),
       });
-
       const data = await res.json();
-
       if (!data.ok) {
-        setStatusMsg(`❌ ${data.error || "Failed to open gate"}`);
+        setStatusMsg(`❌ ${data.error || "Check-in failed"}`);
         setLoading(false);
         return;
       }
-
-      setStatusMsg(`✅ ${data.message} (Slot ${data.slotNo})`);
+      setStatusMsg(`✅ ${data.message} (slot ${data.slotNo})`);
       setReservation(null);
+      setNextAction(null);
+      setToken("");
+    } catch (e) {
+      setStatusMsg(`❌ ${e.message || "Cannot reach server"}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const doCheckOut = async () => {
+    const bookingId = parseBookingId(token);
+    if (bookingId == null) return;
+
+    setLoading(true);
+    setStatusMsg("Checking out...");
+    try {
+      const res = await fetch(`${API_BASE}/gate/check-out`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setStatusMsg(`❌ ${data.error || "Check-out failed"}`);
+        setLoading(false);
+        return;
+      }
+      setStatusMsg(
+        `✅ ${data.message} (slot ${data.slotNo}) — total $${Number(data.totalAmount).toFixed(2)}`
+      );
+      setReservation(null);
+      setNextAction(null);
       setToken("");
     } catch (e) {
       setStatusMsg(`❌ ${e.message || "Cannot reach server"}`);
@@ -105,25 +149,28 @@ const GatekeeperDashboard = () => {
         { facingMode: "environment" },
         {
           fps: 10,
-          qrbox: { width: 260, height: 260 },
+          qrbox: { width: 300, height: 300 },
+          aspectRatio: 1,
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
         },
         (decodedText) => {
           if (loading) return;
+          const trimmed = decodedText.trim();
           html5QrCode.stop().then(() => {
             scannerRef.current = null;
             setCameraActive(false);
-            setToken(decodedText);
-            validateToken(decodedText);
+            setToken(trimmed);
+            loadBooking(trimmed);
           }).catch(() => {
             scannerRef.current = null;
             setCameraActive(false);
-            setToken(decodedText);
-            validateToken(decodedText);
+            setToken(trimmed);
+            loadBooking(trimmed);
           });
         },
         () => {}
       );
-      setStatusMsg("Point the camera at the customer's QR code.");
+      setStatusMsg("Point the camera at the customer's booking QR (booking ID).");
     } catch (err) {
       setCameraError(err?.message || "Could not start camera. Check permissions.");
       setCameraActive(false);
@@ -145,6 +192,7 @@ const GatekeeperDashboard = () => {
   const clearAll = () => {
     setToken("");
     setReservation(null);
+    setNextAction(null);
     setStatusMsg("");
     setCameraError("");
   };
@@ -161,8 +209,8 @@ const GatekeeperDashboard = () => {
 
       <div className="dashboard-content">
         <div className="dashboard-section">
-          <h2>Scan QR with camera</h2>
-          <p className="gatekeeper-hint">Open the camera and point it at the customer's reservation QR code.</p>
+          <h2>Scan booking QR</h2>
+          <p className="gatekeeper-hint">QR contains the booking ID only. First scan = entry (check-in), second = exit (check-out).</p>
 
           <div className="gatekeeper-scanner-actions">
             {!cameraActive ? (
@@ -199,20 +247,26 @@ const GatekeeperDashboard = () => {
 
           {reservation && (
             <div className="gatekeeper-reservation-card">
-              <h3>Reservation details</h3>
+              <h3>Booking details</h3>
+              <p><b>Booking ID:</b> {reservation.id}</p>
               <p><b>Slot:</b> {reservation.slot_no}</p>
               <p><b>Status:</b> {reservation.status}</p>
               <p><b>Start:</b> {new Date(reservation.start_time).toLocaleString()}</p>
               <p><b>End:</b> {new Date(reservation.end_time).toLocaleString()}</p>
+              {reservation.check_in_time && (
+                <p><b>Check-in:</b> {new Date(reservation.check_in_time).toLocaleString()}</p>
+              )}
               <div className="gatekeeper-reservation-actions">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  onClick={openGate}
-                  disabled={loading}
-                >
-                  Open gate
-                </button>
+                {nextAction === "check-in" && (
+                  <button type="button" className="btn btn-primary" onClick={doCheckIn} disabled={loading}>
+                    Check-in (entry)
+                  </button>
+                )}
+                {nextAction === "check-out" && (
+                  <button type="button" className="btn btn-primary" onClick={doCheckOut} disabled={loading}>
+                    Check-out (exit)
+                  </button>
+                )}
                 <button type="button" className="btn btn-secondary" onClick={clearAll}>
                   Clear
                 </button>
@@ -222,22 +276,23 @@ const GatekeeperDashboard = () => {
         </div>
 
         <div className="dashboard-section">
-          <h2>Or enter token manually</h2>
+          <h2>Or enter booking ID manually</h2>
           <div className="gatekeeper-manual-row">
             <input
               type="text"
+              inputMode="numeric"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder="Paste QR token here..."
+              placeholder="Booking ID (number)..."
               className="gatekeeper-token-input"
             />
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => validateToken()}
+              onClick={() => loadBooking(token)}
               disabled={loading}
             >
-              {loading ? "..." : "Validate"}
+              {loading ? "..." : "Load"}
             </button>
             <button type="button" className="btn btn-secondary" onClick={clearAll}>
               Clear

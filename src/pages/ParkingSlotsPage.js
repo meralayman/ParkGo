@@ -1,38 +1,71 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import AlexandriaParkingGrid from '../components/AlexandriaParkingGrid';
 import { LOT_NAME } from '../constants/alexandriaLot';
+import { PARKGO_PENDING_SLOT_KEY } from '../constants/pendingSlot';
 import './ParkingSlotsPage.css';
 
 export { ALEXANDRIA_LOT_PATH, LOT_NAME } from '../constants/alexandriaLot';
 
-/** Demo slot data — replace with API later */
-function buildSlots() {
-  const rows = ['A', 'B', 'C', 'D'];
-  const cols = 6;
-  const slots = [];
-  let n = 0;
-  rows.forEach((row) => {
-    for (let c = 1; c <= cols; c += 1) {
-      n += 1;
-      // Mix of available / occupied for demo
-      const status = n % 5 === 0 || n % 7 === 0 ? 'available' : 'occupied';
-      slots.push({
-        id: `${row}${c}`,
-        label: `${row}${c}`,
-        status,
-      });
-    }
-  });
-  return slots;
-}
+const API_BASE = 'http://localhost:5000';
 
 const ParkingSlotsPage = () => {
-  const slots = useMemo(() => buildSlots(), []);
-  const [selectedId, setSelectedId] = useState(null);
+  const [slots, setSlots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedSlotNo, setSelectedSlotNo] = useState(null);
 
-  const availableCount = slots.filter((s) => s.status === 'available').length;
-  const occupiedCount = slots.length - availableCount;
+  const loadSlots = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE}/slots`);
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.slots)) {
+        setSlots(data.slots);
+      } else {
+        setError(data.error || 'Failed to load parking map');
+      }
+    } catch (err) {
+      setError(err.message || 'Cannot reach the server');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSlots();
+  }, [loadSlots]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(PARKGO_PENDING_SLOT_KEY);
+      if (saved && slots.some((s) => s.slot_no === saved && Number(s.state) === 0)) {
+        setSelectedSlotNo(saved);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [slots]);
+
+  const handleSelect = (slotNo) => {
+    setSelectedSlotNo(slotNo);
+    try {
+      localStorage.setItem(PARKGO_PENDING_SLOT_KEY, slotNo);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const handleClear = () => {
+    setSelectedSlotNo(null);
+    try {
+      localStorage.removeItem(PARKGO_PENDING_SLOT_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
 
   return (
     <div className="parking-slots-page">
@@ -48,64 +81,36 @@ const ParkingSlotsPage = () => {
         <header className="parking-slots-header">
           <h1 className="parking-slots-title">{LOT_NAME}</h1>
           <p className="parking-slots-subtitle">Pick an available slot to continue booking.</p>
-          <p className="parking-slots-stats">
-            <span className="parking-slots-stat available">
-              <strong>{availableCount}</strong> available
-            </span>
-            <span className="parking-slots-stat occupied">
-              <strong>{occupiedCount}</strong> occupied
-            </span>
-          </p>
         </header>
 
-        <div className="parking-slots-legend" role="list">
-          <span className="parking-slots-legend-item">
-            <span className="parking-slots-swatch available" /> Available
-          </span>
-          <span className="parking-slots-legend-item">
-            <span className="parking-slots-swatch occupied" /> Occupied
-          </span>
-          <span className="parking-slots-legend-item">
-            <span className="parking-slots-swatch selected" /> Selected
-          </span>
-        </div>
+        {loading ? (
+          <p className="parking-slots-subtitle">Loading live availability…</p>
+        ) : error ? (
+          <p className="parking-slots-subtitle" style={{ color: '#b91c1c' }}>
+            {error}{' '}
+            <button type="button" className="parking-slots-back" style={{ border: 'none', background: 'none', cursor: 'pointer' }} onClick={loadSlots}>
+              Retry
+            </button>
+          </p>
+        ) : (
+          <AlexandriaParkingGrid
+            slots={slots}
+            selectedSlotNo={selectedSlotNo}
+            onSlotClick={handleSelect}
+            showLegend
+          />
+        )}
 
-        <section className="parking-slots-grid-wrap" aria-label="Parking slots">
-          <div className="parking-slots-grid">
-            {slots.map((slot) => {
-              const isAvailable = slot.status === 'available';
-              const isSelected = selectedId === slot.id;
-              return (
-                <button
-                  key={slot.id}
-                  type="button"
-                  className={`parking-slot ${slot.status} ${isSelected ? 'selected' : ''}`}
-                  disabled={!isAvailable}
-                  onClick={() => isAvailable && setSelectedId(slot.id)}
-                  aria-pressed={isSelected}
-                  aria-label={
-                    isAvailable
-                      ? `Slot ${slot.label}, available`
-                      : `Slot ${slot.label}, occupied`
-                  }
-                >
-                  {slot.label}
-                </button>
-              );
-            })}
-          </div>
-        </section>
-
-        {selectedId && (
+        {selectedSlotNo && !loading && !error && (
           <div className="parking-slots-actions">
             <p className="parking-slots-selected-msg">
-              Slot <strong>{selectedId}</strong> selected.
+              Slot <strong>{selectedSlotNo}</strong> selected. After you log in, this spot stays selected for your reservation.
             </p>
             <div className="parking-slots-action-btns">
               <Link to="/login" className="parking-slots-btn primary">
                 Continue to login
               </Link>
-              <button type="button" className="parking-slots-btn ghost" onClick={() => setSelectedId(null)}>
+              <button type="button" className="parking-slots-btn ghost" onClick={handleClear}>
                 Clear selection
               </button>
             </div>

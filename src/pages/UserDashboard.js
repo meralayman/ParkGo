@@ -1,19 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
+import AlexandriaParkingGrid from '../components/AlexandriaParkingGrid';
+import { LOT_NAME } from '../constants/alexandriaLot';
+import { PARKGO_PENDING_SLOT_KEY } from '../constants/pendingSlot';
 import './Dashboard.css';
 import { QRCodeCanvas } from "qrcode.react";
 
 const API_BASE = 'http://localhost:5000';
 
-// State mapping for UI
-const stateLabel = (s) => {
-  if (s === 0) return 'Empty';
-  if (s === 1) return 'Occupied';
-  if (s === 2) return 'Reserved';
-  return String(s);
-};
+/** Match backend PARKING_HOURLY_RATE (extend button) */
+const HOURLY_RATE = 5;
+/** Match backend OVERSTAY_HOURLY_RATE — shown for past-end-time text; set REACT_APP_OVERSTAY_HOURLY_RATE if you override it */
+const OVERSTAY_RATE_DISPLAY =
+  Number(process.env.REACT_APP_OVERSTAY_HOURLY_RATE) || HOURLY_RATE;
 
 const UserDashboard = () => {
   const navigate = useNavigate();
@@ -37,6 +38,27 @@ const UserDashboard = () => {
     paymentMethod: 'cash'
   });
 
+  /** Slot chosen on the public map or here; kept in localStorage across login */
+  const [pendingSlotNo, setPendingSlotNo] = useState(null);
+
+  const clearPendingSlot = () => {
+    setPendingSlotNo(null);
+    try {
+      localStorage.removeItem(PARKGO_PENDING_SLOT_KEY);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(PARKGO_PENDING_SLOT_KEY);
+      if (saved) setPendingSlotNo(saved);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   useEffect(() => {
     loadSlots();
   }, []);
@@ -46,6 +68,15 @@ const UserDashboard = () => {
       loadReservationsAndHistory();
     }
   }, [user?.id]);
+
+  /** Drop pending selection if that slot is gone or no longer free */
+  useEffect(() => {
+    if (!pendingSlotNo || !slots.length) return;
+    const row = slots.find((s) => s.slot_no === pendingSlotNo);
+    if (!row || Number(row.state) !== 0) {
+      clearPendingSlot();
+    }
+  }, [slots, pendingSlotNo]);
 
   const loadSlots = async () => {
     setSlotsLoading(true);
@@ -75,6 +106,7 @@ const UserDashboard = () => {
       id: r.id,
       parkingSpot: r.slot_no,
       date: r.start_time,
+      endTime: r.end_time,
       time: start.toTimeString().slice(0, 5),
       duration: durationHours,
       vehicleType: r.vehicle_type || '-',
@@ -82,6 +114,8 @@ const UserDashboard = () => {
       status: r.status,
       createdAt: r.created_at,
       qrToken: r.qr_token,
+      checkInTime: r.check_in_time,
+      checkOutTime: r.check_out_time,
       paymentMethod: r.payment_method || 'cash',
     };
   };
@@ -96,11 +130,13 @@ const UserDashboard = () => {
       if (data.ok && Array.isArray(data.reservations)) {
         const mapped = data.reservations.map(mapApiReservationToUI);
 
-        const active = mapped.filter(r => r.status === 'active');
+        const active = mapped.filter((r) => ['confirmed', 'checked_in'].includes(r.status));
         setReservations(active);
 
-        const sortedHistory = mapped.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        setHistory(sortedHistory);
+        const hist = mapped
+          .filter((r) => !['confirmed', 'checked_in'].includes(r.status))
+          .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setHistory(hist);
       }
     } catch (err) {
       console.error('Failed to load reservations/history', err);
@@ -143,6 +179,7 @@ const UserDashboard = () => {
             startTime: startTime.toISOString(),
             endTime: endTime.toISOString(),
             totalAmount,
+            slotNo: pendingSlotNo || undefined,
           },
         },
       });
@@ -158,7 +195,8 @@ const UserDashboard = () => {
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
           totalAmount,
-          paymentMethod: 'cash'
+          paymentMethod: 'cash',
+          slotNo: pendingSlotNo || undefined,
         })
       });
 
@@ -171,6 +209,7 @@ const UserDashboard = () => {
       await loadReservationsAndHistory();
       await loadSlots();
 
+      clearPendingSlot();
       setShowReservationModal(false);
       setReservationData({
         date: '',
@@ -180,11 +219,57 @@ const UserDashboard = () => {
         paymentMethod: 'cash'
       });
 
-      alert(`Reservation created ✅\nSlot: ${data.reservation.slot_no}\nPay cash when leaving and get your exit QR from this dashboard.`);
+      alert(
+        `Reservation created ✅\nSlot: ${data.reservation.slot_no}\nBooking ID: ${data.reservation.id}\nThe QR encodes PARKGO|V1|${data.reservation.id} for the gate scanner.`
+      );
     } catch (err) {
       alert(err.message || 'Cannot reach server');
     }
   };
+
+  const overdueReservations = useMemo(() => {
+    const now = Date.now();
+    return reservations.filter(
+      (r) =>
+        ['confirmed', 'checked_in'].includes(r.status) &&
+        r.endTime &&
+        new Date(r.endTime).getTime() < now
+    );
+  }, [reservations]);
+
+  const [overstayActionLoading, setOverstayActionLoading] = useState(false);
+
+  const handleOverstayExtend = async (reservationId) => {
+    if (!user?.id) return;
+    setOverstayActionLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/reservations/${reservationId}/overstay-extend`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        alert(data.error || 'Could not extend reservation');
+        return;
+      }
+      await loadReservationsAndHistory();
+      await loadSlots();
+      alert(data.message || 'Reservation extended by 1 hour.');
+    } catch (err) {
+      alert(err.message || 'Cannot reach server');
+    } finally {
+      setOverstayActionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const t = setInterval(() => {
+      loadReservationsAndHistory();
+    }, 45000);
+    return () => clearInterval(t);
+  }, [user?.id]);
 
   const handleCancelReservation = async (id) => {
     if (!window.confirm('Are you sure you want to cancel this reservation?')) return;
@@ -216,6 +301,31 @@ const UserDashboard = () => {
       </header>
 
       <div className="dashboard-content">
+        {overdueReservations.length > 0 && (
+          <div className="overstay-panel" role="region" aria-label="Parking time ended">
+            {overdueReservations.map((ov) => (
+              <div key={ov.id} className="overstay-card">
+                <h3 className="overstay-title">Parking time ended</h3>
+                <p className="overstay-text">
+                  Spot <strong>{ov.parkingSpot}</strong> — your booking ended at{' '}
+                  <strong>{new Date(ov.endTime).toLocaleString()}</strong>. Add another hour below if you need more time.
+                  If you leave without extending, extra fees apply: <strong>${OVERSTAY_RATE_DISPLAY.toFixed(2)} per hour</strong> for each full hour past your end time (rounded up), added when you scan out at the gate.
+                </p>
+                <div className="overstay-actions">
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    disabled={overstayActionLoading}
+                    onClick={() => handleOverstayExtend(ov.id)}
+                  >
+                    {`Add 1 more hour (+$${HOURLY_RATE.toFixed(2)})`}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="dashboard-actions">
           <button
             onClick={() => setShowReservationModal(true)}
@@ -233,8 +343,14 @@ const UserDashboard = () => {
         </div>
 
         <div className="dashboard-sections">
-          <div className="dashboard-section">
+          <div className="dashboard-section parking-overview-dashboard">
             <h2>Parking Overview</h2>
+            <p className="parking-overview-hint">
+              {LOT_NAME} — same map as on the booking page.{' '}
+              {pendingSlotNo
+                ? <>Selected spot: <strong>{pendingSlotNo}</strong> (used when you confirm a reservation).</>
+                : <>Tap a green slot to choose it, then open <strong>Make Reservation</strong>.</>}
+            </p>
 
             {slotsLoading ? (
               <p className="empty-state">Loading slots...</p>
@@ -243,105 +359,87 @@ const UserDashboard = () => {
             ) : slots.length === 0 ? (
               <p className="empty-state">No slots available</p>
             ) : (
-              <>
-                <div className="slots-stats-row">
-                  <div className="slots-stat-card">
-                    <div className="slots-stat-circle slots-stat-total">{slots.length}</div>
-                    <span>{slots.length} Total spots</span>
-                  </div>
-                  <div className="slots-stat-card">
-                    <div className="slots-stat-circle slots-stat-occupied">
-                      {slots.filter(s => Number(s.state) === 1).length}
-                    </div>
-                    <span>{slots.filter(s => Number(s.state) === 1).length} Occupied</span>
-                  </div>
-                  <div className="slots-stat-card">
-                    <div className="slots-stat-circle slots-stat-available">
-                      {slots.filter(s => Number(s.state) === 0).length}
-                    </div>
-                    <span>{slots.filter(s => Number(s.state) === 0).length} Available</span>
-                  </div>
-                </div>
-                <div className="slots-grid parking-overview-grid">
-                  {slots.map((slot, idx) => (
-                    <div key={slot.slot_no} className={`slot-card slot-card-visual slot-state-${slot.state}`} title={`Slot ${slot.slot_no} - ${stateLabel(slot.state)}`}>
-                      <div className={`slot-car-icon ${Number(slot.state) === 0 ? 'slot-car-empty' : `slot-car-filled slot-car-${['blue', 'purple', 'teal', 'blue-light', 'indigo'][idx % 5]}`}`}>
-                        <svg viewBox="0 0 24 24" className="slot-car-svg" fill="currentColor">
-                          <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
-                        </svg>
-                      </div>
-                      <span className="slot-label">Slot {slot.slot_no}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
+              <AlexandriaParkingGrid
+                slots={slots}
+                selectedSlotNo={pendingSlotNo}
+                onSlotClick={(slotNo) => {
+                  setPendingSlotNo(slotNo);
+                  try {
+                    localStorage.setItem(PARKGO_PENDING_SLOT_KEY, slotNo);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                showLegend
+              />
             )}
           </div>
 
           <div className="dashboard-section">
-            <h2>Active Reservations</h2>
+            <h2>Current bookings</h2>
+            <p className="parking-overview-hint" style={{ marginBottom: '0.75rem' }}>
+              QR codes contain your <strong>booking ID</strong> only — show at entry (check-in) and exit (check-out).
+            </p>
             <div className="table-container">
               {reservations.length === 0 ? (
-                <p className="empty-state">No active reservations</p>
+                <p className="empty-state">No current bookings</p>
               ) : (
                 <table className="data-table">
                   <thead>
                     <tr>
+                      <th>ID</th>
                       <th>Parking Spot</th>
+                      <th>Status</th>
                       <th>Date</th>
                       <th>Time</th>
                       <th>Duration (hours)</th>
-                      <th>Amount</th>
-                      <th>QR</th>
+                      <th>Est. amount</th>
+                      <th>Booking QR</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {reservations.map((reservation) => (
                       <tr key={reservation.id}>
+                        <td>{reservation.id}</td>
                         <td>{reservation.parkingSpot}</td>
+                        <td>
+                          <span className={`status-badge status-${reservation.status}`}>
+                            {reservation.status}
+                          </span>
+                        </td>
                         <td>{new Date(reservation.date).toLocaleDateString()}</td>
                         <td>{reservation.time}</td>
                         <td>{reservation.duration}</td>
                         <td>${reservation.totalAmount?.toFixed(2) || '0.00'}</td>
                         <td>
-                          {reservation.paymentMethod === 'cash' ? (
-                            reservation.qrToken ? (
-                              <div className="exit-qr-cell">
-                                <button
-                                  type="button"
-                                  className="btn btn-primary btn-sm"
-                                  onClick={() => {
-                                    setExitQRReservation(reservation);
-                                    setShowExitQRModal(true);
-                                  }}
-                                >
-                                  Leaving? Get exit QR
-                                </button>
-                                <small className="text-muted d-block mt-1">Pay cash at exit, then show QR</small>
-                              </div>
-                            ) : (
-                              '-'
-                            )
-                          ) : reservation.qrToken ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "center" }}>
-                              <QRCodeCanvas value={reservation.qrToken} size={90} />
-                              <small style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>
-                                {reservation.qrToken}
-                              </small>
-                            </div>
-                          ) : (
-                            "-"
-                          )}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                            <QRCodeCanvas value={String(reservation.id)} size={90} />
+                            <small>ID: {reservation.id}</small>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                setExitQRReservation(reservation);
+                                setShowExitQRModal(true);
+                              }}
+                            >
+                              Larger QR
+                            </button>
+                          </div>
                         </td>
 
                         <td>
-                          <button
-                            onClick={() => handleCancelReservation(reservation.id)}
-                            className="btn btn-sm btn-delete"
-                          >
-                            Cancel
-                          </button>
+                          {reservation.status === 'confirmed' ? (
+                            <button
+                              onClick={() => handleCancelReservation(reservation.id)}
+                              className="btn btn-sm btn-delete"
+                            >
+                              Cancel
+                            </button>
+                          ) : (
+                            <span className="text-muted" style={{ fontSize: 12 }}>Checked in</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -395,12 +493,13 @@ const UserDashboard = () => {
       {showExitQRModal && exitQRReservation && (
         <div className="modal-overlay" onClick={() => setShowExitQRModal(false)}>
           <div className="modal-content exit-qr-modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Pay cash &amp; show exit QR</h2>
+            <h2>Pay cash &amp; show booking QR</h2>
             <p className="exit-qr-instruction">
-              Pay <strong>${exitQRReservation.totalAmount?.toFixed(2) || '0.00'}</strong> cash to the gatekeeper. After paying, show this QR for them to scan to open the gate.
+              Pay <strong>${exitQRReservation.totalAmount?.toFixed(2) || '0.00'}</strong> cash to the gatekeeper. Show this QR for <strong>check-out</strong> — final amount is calculated at exit.
             </p>
             <div className="exit-qr-code-wrap">
-              <QRCodeCanvas value={exitQRReservation.qrToken} size={220} />
+              <QRCodeCanvas value={String(exitQRReservation.id)} size={220} />
+              <p className="exit-qr-instruction" style={{ marginTop: 12 }}>Booking ID: {exitQRReservation.id}</p>
             </div>
             <div className="modal-actions">
               <button type="button" className="btn btn-primary" onClick={() => setShowExitQRModal(false)}>
@@ -421,7 +520,9 @@ const UserDashboard = () => {
               handleCreateReservation();
             }}>
               <p className="form-hint">
-                A parking slot will be assigned automatically from available slots.
+                {pendingSlotNo
+                  ? `You are reserving spot ${pendingSlotNo}. Change it by tapping another green slot on the map above.`
+                  : 'Choose a green slot on the map above, or we will assign the first available spot when you confirm.'}
               </p>
 
               <div className="form-row">

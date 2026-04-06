@@ -1,6 +1,5 @@
 -- Run this as PostgreSQL superuser (e.g. postgres) to fix "permission denied for table users".
 -- From project root: psql -U postgres -d parkgo_db -f backend/scripts/init-db.sql
--- Or from backend: psql -U postgres -d parkgo_db -f scripts/init-db.sql
 
 -- Create users table if it doesn't exist (matches server.js schema)
 CREATE TABLE IF NOT EXISTS users (
@@ -16,11 +15,9 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Grant full access to the app user (must match DATABASE_URL user, e.g. parkgo_user)
 GRANT ALL ON TABLE users TO parkgo_user;
 GRANT USAGE, SELECT ON SEQUENCE users_id_seq TO parkgo_user;
 
--- Parking slots table (used by API: slot_no, state 0=available 1=occupied 2=reserved)
 CREATE TABLE IF NOT EXISTS parking_slots (
   slot_no VARCHAR(50) PRIMARY KEY,
   state INTEGER NOT NULL DEFAULT 0,
@@ -28,29 +25,37 @@ CREATE TABLE IF NOT EXISTS parking_slots (
 );
 GRANT ALL ON TABLE parking_slots TO parkgo_user;
 
--- Seed 30 default parking slots (A-101..A-110, B-201..B-210, C-301..C-310)
--- Admin can add more via Dashboard > Manage Slots > Add Slot
 INSERT INTO parking_slots (slot_no, state) VALUES
-  ('A-101', 0), ('A-102', 0), ('A-103', 0), ('A-104', 0), ('A-105', 0),
-  ('A-106', 0), ('A-107', 0), ('A-108', 0), ('A-109', 0), ('A-110', 0),
-  ('B-201', 0), ('B-202', 0), ('B-203', 0), ('B-204', 0), ('B-205', 0),
-  ('B-206', 0), ('B-207', 0), ('B-208', 0), ('B-209', 0), ('B-210', 0),
-  ('C-301', 0), ('C-302', 0), ('C-303', 0), ('C-304', 0), ('C-305', 0),
-  ('C-306', 0), ('C-307', 0), ('C-308', 0), ('C-309', 0), ('C-310', 0)
+  ('A1', 0), ('A2', 0), ('A3', 0), ('A4', 0), ('A5', 0), ('A6', 0),
+  ('B1', 0), ('B2', 0), ('B3', 0), ('B4', 0), ('B5', 0), ('B6', 0),
+  ('C1', 0), ('C2', 0), ('C3', 0), ('C4', 0), ('C5', 0), ('C6', 0),
+  ('D1', 0), ('D2', 0), ('D3', 0), ('D4', 0), ('D5', 0), ('D6', 0)
 ON CONFLICT (slot_no) DO NOTHING;
 
--- Reservations table
 CREATE TABLE IF NOT EXISTS reservations (
   id SERIAL PRIMARY KEY,
   user_id INTEGER NOT NULL REFERENCES users(id),
   slot_no VARCHAR(50) NOT NULL,
   start_time TIMESTAMP WITH TIME ZONE NOT NULL,
   end_time TIMESTAMP WITH TIME ZONE NOT NULL,
-  status VARCHAR(20) NOT NULL DEFAULT 'active',
+  status VARCHAR(20) NOT NULL DEFAULT 'confirmed',
   payment_method VARCHAR(50),
   total_amount DECIMAL(10,2) DEFAULT 0,
   qr_token VARCHAR(255),
+  check_in_time TIMESTAMP WITH TIME ZONE,
+  check_out_time TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 GRANT ALL ON TABLE reservations TO parkgo_user;
 GRANT USAGE, SELECT ON SEQUENCE reservations_id_seq TO parkgo_user;
+
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS check_in_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS check_out_time TIMESTAMP WITH TIME ZONE;
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS late_fee_applied BOOLEAN DEFAULT FALSE;
+
+-- Status: confirmed | checked_in | closed | cancelled | no_show
+ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_status_check;
+UPDATE reservations SET status = 'confirmed' WHERE status = 'active';
+UPDATE reservations SET status = 'closed' WHERE status IN ('completed', 'used');
+ALTER TABLE reservations ADD CONSTRAINT reservations_status_check
+  CHECK (status IN ('confirmed', 'checked_in', 'closed', 'cancelled', 'no_show'));

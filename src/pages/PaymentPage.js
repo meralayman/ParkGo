@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import './AuthPages.css';
 import './Dashboard.css';
+import { PARKGO_PENDING_SLOT_KEY } from '../constants/pendingSlot';
 
 const API_BASE = 'http://localhost:5000';
 
@@ -66,6 +67,11 @@ const PaymentPage = () => {
         return;
       }
 
+      try {
+        localStorage.removeItem(PARKGO_PENDING_SLOT_KEY);
+      } catch {
+        /* ignore */
+      }
       navigate('/user', { replace: true });
     } catch (err) {
       setError(err.message || 'Cannot reach server');

@@ -18,6 +18,8 @@ CREATE DATABASE parkgo_db OWNER parkgo_user;
 \c parkgo_db
 ```
 
+The init script also seeds **24 parking slots** (`A1`–`D6` grid) so the public booking page and user dashboard show the same map. If you already ran an older `init-db.sql` with different slot names, either keep your data or add matching rows manually.
+
 Then run the init script so the app can use the `users` table (avoids "permission denied for table users"):
 
 **From the ParkGo project root:**
