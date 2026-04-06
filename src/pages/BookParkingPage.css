@@ -1,0 +1,497 @@
+.book-parking-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 24%);
+  color: #0f172a;
+}
+
+.book-parking-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+@media (min-width: 768px) {
+  .book-parking-main {
+    padding: 2rem 2rem 4rem;
+  }
+}
+
+.book-parking-hero {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+@media (min-width: 900px) {
+  .book-parking-hero {
+    margin-bottom: 2.25rem;
+  }
+}
+
+.book-parking-title {
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem 0;
+}
+
+.book-parking-subtitle {
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0;
+  max-width: 36rem;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.5;
+}
+
+/* Split layout */
+.book-parking-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2.5rem;
+}
+
+@media (min-width: 992px) {
+  .book-parking-split {
+    grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+    gap: 1.75rem;
+    align-items: start;
+  }
+}
+
+.book-parking-panel {
+  background: #ffffff;
+  border: 1px solid #e8eef4;
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+}
+
+.book-parking-search-wrap {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.book-parking-search-icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+  display: flex;
+}
+
+.book-parking-search {
+  width: 100%;
+  padding: 0.75rem 1rem 0.75rem 2.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  font-size: 0.9375rem;
+  background: #f8fafc;
+  color: #0f172a;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.book-parking-search::placeholder {
+  color: #94a3b8;
+}
+
+.book-parking-search:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  background: #fff;
+}
+
+.book-parking-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+}
+
+.book-parking-select {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  background: #fff;
+  color: #334155;
+  margin-bottom: 1rem;
+}
+
+.book-parking-select:disabled {
+  opacity: 1;
+  cursor: default;
+  background: #f8fafc;
+  color: #334155;
+}
+
+.book-parking-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.book-parking-chip {
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.book-parking-chip:hover {
+  border-color: #bfdbfe;
+  color: #2563eb;
+}
+
+.book-parking-chip.active {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #fff;
+}
+
+.book-parking-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.book-parking-mini-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #f1f5f9;
+  border-radius: 12px;
+  background: #fafbfc;
+}
+
+.book-parking-card-ico {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.book-parking-mini-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.book-parking-mini-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 0.2rem 0;
+}
+
+.book-parking-mini-meta {
+  font-size: 0.8125rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.book-parking-select-btn {
+  flex-shrink: 0;
+  padding: 0.45rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.book-parking-select-btn:hover {
+  background: #1d4ed8;
+}
+
+.book-parking-own-system {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.875rem;
+  border-radius: 12px;
+  border: 1px dashed #93c5fd;
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.book-parking-own-system:hover {
+  border-color: #2563eb;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.12);
+}
+
+.book-parking-own-ico {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.book-parking-own-system strong {
+  display: block;
+  color: #1e40af;
+  font-size: 0.9rem;
+  margin-bottom: 0.2rem;
+}
+
+.book-parking-own-sub {
+  display: block;
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 400;
+}
+
+/* Map */
+.book-parking-map-section {
+  background: #ffffff;
+  border: 1px solid #e8eef4;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+  min-height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+.book-parking-map-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fafbfc;
+}
+
+.book-parking-map-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #475569;
+  cursor: pointer;
+}
+
+.book-parking-map-tools {
+  display: flex;
+  gap: 0.35rem;
+}
+
+.book-parking-map-tool {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  cursor: pointer;
+}
+
+.book-parking-map-tool:hover {
+  color: #2563eb;
+  border-color: #bfdbfe;
+}
+
+.book-parking-map {
+  position: relative;
+  flex: 1;
+  min-height: 360px;
+  overflow: hidden;
+}
+
+.book-parking-map-bg {
+  position: absolute;
+  inset: 0;
+  background-color: #e8f0f4;
+  background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 31px,
+      rgba(148, 163, 184, 0.12) 31px,
+      rgba(148, 163, 184, 0.12) 32px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 31px,
+      rgba(148, 163, 184, 0.12) 31px,
+      rgba(148, 163, 184, 0.12) 32px
+    ),
+    radial-gradient(ellipse 80% 60% at 40% 45%, rgba(186, 230, 253, 0.35) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 70% 60%, rgba(203, 213, 225, 0.4) 0%, transparent 50%);
+}
+
+.book-parking-pin {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  width: 36px;
+  height: 42px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  z-index: 2;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+}
+
+.book-parking-pin-bubble {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin: 0 auto;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+}
+
+.book-parking-pin.active .book-parking-pin-bubble {
+  background: #16a34a;
+  width: 38px;
+  height: 38px;
+  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.35);
+}
+
+.book-parking-popup {
+  position: absolute;
+  z-index: 3;
+  width: min(220px, 85%);
+  padding: 1rem;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.15);
+  border: 1px solid #e8eef4;
+  transform: translate(-50%, calc(-100% - 20px));
+  text-align: left;
+}
+
+.book-parking-popup-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.35rem 0;
+}
+
+.book-parking-popup-dist {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin: 0 0 0.25rem 0;
+}
+
+.book-parking-popup-spots {
+  font-size: 0.8125rem;
+  color: #16a34a;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+}
+
+.book-parking-popup-btn {
+  width: 100%;
+  padding: 0.5rem;
+  border: none;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.book-parking-popup-btn:hover {
+  background: #1d4ed8;
+}
+
+/* Bottom row */
+.book-parking-bottom {
+  margin-top: 0.5rem;
+}
+
+.book-parking-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+@media (min-width: 768px) {
+  .book-parking-bottom-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.book-parking-bottom-grid--single {
+  grid-template-columns: 1fr;
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.book-parking-bottom-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: #ffffff;
+  border: 1px solid #e8eef4;
+  border-radius: 16px;
+  box-shadow: 0 2px 16px rgba(15, 23, 42, 0.05);
+}
+
+.book-parking-bottom-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.book-parking-bottom-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 0.25rem 0;
+}
+
+.book-parking-bottom-meta {
+  font-size: 0.875rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

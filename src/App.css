@@ -1,0 +1,27 @@
+.App {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg-dark);
+  color: var(--text-primary);
+}
+
+/* Home / landing — light shell (matches Smart Parking Layout reference) */
+.App--landing {
+  background: #ffffff;
+  color: #0f172a;
+}
+
+html:has(.App--landing),
+body:has(.App--landing) {
+  background: #ffffff;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  color: var(--text-primary);
+  font-size: 1.125rem;
+  font-weight: 500;
+}

@@ -1,0 +1,208 @@
+.parking-slots-page {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 40%);
+  color: #0f172a;
+}
+
+.parking-slots-main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.25rem 1.25rem 3rem;
+}
+
+@media (min-width: 768px) {
+  .parking-slots-main {
+    padding: 2rem 2rem 4rem;
+  }
+}
+
+.parking-slots-breadcrumb {
+  margin-bottom: 1.25rem;
+}
+
+.parking-slots-back {
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.parking-slots-back:hover {
+  text-decoration: underline;
+}
+
+.parking-slots-header {
+  margin-bottom: 1.5rem;
+}
+
+.parking-slots-title {
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.5rem 0;
+  line-height: 1.25;
+}
+
+.parking-slots-subtitle {
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0 0 1rem 0;
+}
+
+.parking-slots-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.9375rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.parking-slots-stat.available strong {
+  color: #16a34a;
+}
+
+.parking-slots-stat.occupied strong {
+  color: #94a3b8;
+}
+
+.parking-slots-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+.parking-slots-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.parking-slots-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.parking-slots-swatch.available {
+  background: #dcfce7;
+  border-color: #86efac;
+}
+
+.parking-slots-swatch.occupied {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.parking-slots-swatch.selected {
+  background: #dbeafe;
+  border-color: #2563eb;
+}
+
+.parking-slots-grid-wrap {
+  background: #ffffff;
+  border: 1px solid #e8eef4;
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+}
+
+.parking-slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 0.65rem;
+}
+
+.parking-slot {
+  min-height: 52px;
+  border-radius: 10px;
+  border: 2px solid #e2e8f0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.parking-slot.available {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
+}
+
+.parking-slot.available:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.2);
+  border-color: #22c55e;
+}
+
+.parking-slot.occupied {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+.parking-slot.selected {
+  background: #eff6ff;
+  border-color: #2563eb;
+  color: #1d4ed8;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+}
+
+.parking-slots-actions {
+  margin-top: 1.75rem;
+  padding: 1.25rem;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.parking-slots-selected-msg {
+  margin: 0 0 1rem 0;
+  font-size: 0.9375rem;
+  color: #334155;
+}
+
+.parking-slots-action-btns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.parking-slots-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 1.25rem;
+  border-radius: 10px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+}
+
+.parking-slots-btn.primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.parking-slots-btn.primary:hover {
+  background: #1d4ed8;
+}
+
+.parking-slots-btn.ghost {
+  background: #fff;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.parking-slots-btn.ghost:hover {
+  border-color: #cbd5e1;
+  color: #334155;
+}
