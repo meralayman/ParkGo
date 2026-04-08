@@ -1,7 +1,7 @@
 .book-parking-page {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 24%);
-  color: #0f172a;
+  background: var(--bg-dark);
+  color: var(--text-primary);
 }
 
 .book-parking-main {
@@ -30,14 +30,14 @@
 .book-parking-title {
   font-size: clamp(1.5rem, 3.5vw, 2rem);
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary);
   letter-spacing: -0.02em;
   margin: 0 0 0.5rem 0;
 }
 
 .book-parking-subtitle {
   font-size: 1rem;
-  color: #64748b;
+  color: var(--text-muted);
   margin: 0;
   max-width: 36rem;
   margin-left: auto;
@@ -62,11 +62,11 @@
 }
 
 .book-parking-panel {
-  background: #ffffff;
-  border: 1px solid #e8eef4;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   border-radius: 16px;
   padding: 1.25rem;
-  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-md);
 }
 
 .book-parking-search-wrap {
@@ -79,7 +79,7 @@
   left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: #94a3b8;
+  color: var(--text-muted);
   pointer-events: none;
   display: flex;
 }
@@ -87,23 +87,23 @@
 .book-parking-search {
   width: 100%;
   padding: 0.75rem 1rem 0.75rem 2.75rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
   font-size: 0.9375rem;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .book-parking-search::placeholder {
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 
 .book-parking-search:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
-  background: #fff;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+  background: var(--bg-card);
 }
 
 .book-parking-label {
@@ -112,26 +112,26 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #64748b;
+  color: var(--text-muted);
   margin-bottom: 0.35rem;
 }
 
 .book-parking-select {
   width: 100%;
   padding: 0.65rem 0.75rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
   font-size: 0.9375rem;
-  background: #fff;
-  color: #334155;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
   margin-bottom: 1rem;
 }
 
 .book-parking-select:disabled {
   opacity: 1;
   cursor: default;
-  background: #f8fafc;
-  color: #334155;
+  background: var(--bg-card);
+  color: var(--text-muted);
 }
 
 .book-parking-chips {
@@ -144,9 +144,9 @@
 .book-parking-chip {
   padding: 0.45rem 0.85rem;
   border-radius: 999px;
-  border: 1px solid #e2e8f0;
-  background: #fff;
-  color: #64748b;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
   font-size: 0.8125rem;
   font-weight: 500;
   cursor: pointer;
@@ -154,13 +154,13 @@
 }
 
 .book-parking-chip:hover {
-  border-color: #bfdbfe;
-  color: #2563eb;
+  border-color: rgba(96, 165, 250, 0.45);
+  color: var(--logo-blue-light);
 }
 
 .book-parking-chip.active {
-  background: #2563eb;
-  border-color: #2563eb;
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
   color: #fff;
 }
 
@@ -176,9 +176,9 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.75rem;
-  border: 1px solid #f1f5f9;
+  border: 1px solid var(--border-subtle);
   border-radius: 12px;
-  background: #fafbfc;
+  background: var(--bg-elevated);
 }
 
 .book-parking-card-ico {
@@ -195,13 +195,13 @@
 .book-parking-mini-title {
   font-size: 0.9375rem;
   font-weight: 600;
-  color: #1e293b;
+  color: var(--text-primary);
   margin: 0 0 0.2rem 0;
 }
 
 .book-parking-mini-meta {
   font-size: 0.8125rem;
-  color: #64748b;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -210,16 +210,16 @@
   padding: 0.45rem 1rem;
   border-radius: 8px;
   border: none;
-  background: #2563eb;
+  background: var(--accent-blue);
   color: #fff;
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, filter 0.2s;
 }
 
 .book-parking-select-btn:hover {
-  background: #1d4ed8;
+  filter: brightness(1.08);
 }
 
 .book-parking-own-system {
@@ -228,16 +228,16 @@
   gap: 0.75rem;
   padding: 0.875rem;
   border-radius: 12px;
-  border: 1px dashed #93c5fd;
-  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
+  border: 1px dashed rgba(96, 165, 250, 0.45);
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.14) 0%, var(--bg-card) 100%);
   text-decoration: none;
   color: inherit;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .book-parking-own-system:hover {
-  border-color: #2563eb;
-  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.12);
+  border-color: var(--logo-blue);
+  box-shadow: var(--shadow-sm);
 }
 
 .book-parking-own-ico {
@@ -247,7 +247,7 @@
 
 .book-parking-own-system strong {
   display: block;
-  color: #1e40af;
+  color: var(--logo-blue-light);
   font-size: 0.9rem;
   margin-bottom: 0.2rem;
 }
@@ -255,17 +255,17 @@
 .book-parking-own-sub {
   display: block;
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--text-muted);
   font-weight: 400;
 }
 
 /* Map */
 .book-parking-map-section {
-  background: #ffffff;
-  border: 1px solid #e8eef4;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-md);
   min-height: 420px;
   display: flex;
   flex-direction: column;
@@ -276,8 +276,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid #f1f5f9;
-  background: #fafbfc;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
 }
 
 .book-parking-map-filters {
@@ -285,12 +285,12 @@
   align-items: center;
   gap: 0.35rem;
   padding: 0.4rem 0.75rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  background: #fff;
+  background: var(--bg-card);
   font-size: 0.8125rem;
   font-weight: 500;
-  color: #475569;
+  color: var(--text-muted);
   cursor: pointer;
 }
 
@@ -305,16 +305,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  background: #fff;
-  color: #64748b;
+  background: var(--bg-card);
+  color: var(--text-muted);
   cursor: pointer;
 }
 
 .book-parking-map-tool:hover {
-  color: #2563eb;
-  border-color: #bfdbfe;
+  color: var(--logo-blue-light);
+  border-color: rgba(96, 165, 250, 0.4);
 }
 
 .book-parking-map {
@@ -327,23 +327,23 @@
 .book-parking-map-bg {
   position: absolute;
   inset: 0;
-  background-color: #e8f0f4;
+  background-color: #0c1524;
   background-image: repeating-linear-gradient(
       0deg,
       transparent,
       transparent 31px,
-      rgba(148, 163, 184, 0.12) 31px,
-      rgba(148, 163, 184, 0.12) 32px
+      rgba(148, 163, 184, 0.08) 31px,
+      rgba(148, 163, 184, 0.08) 32px
     ),
     repeating-linear-gradient(
       90deg,
       transparent,
       transparent 31px,
-      rgba(148, 163, 184, 0.12) 31px,
-      rgba(148, 163, 184, 0.12) 32px
+      rgba(148, 163, 184, 0.08) 31px,
+      rgba(148, 163, 184, 0.08) 32px
     ),
-    radial-gradient(ellipse 80% 60% at 40% 45%, rgba(186, 230, 253, 0.35) 0%, transparent 55%),
-    radial-gradient(ellipse 70% 50% at 70% 60%, rgba(203, 213, 225, 0.4) 0%, transparent 50%);
+    radial-gradient(ellipse 80% 60% at 40% 45%, rgba(37, 99, 235, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 50% at 70% 60%, rgba(51, 65, 85, 0.5) 0%, transparent 50%);
 }
 
 .book-parking-pin {
@@ -356,7 +356,7 @@
   background: transparent;
   cursor: pointer;
   z-index: 2;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
 }
 
 .book-parking-pin-bubble {
@@ -367,19 +367,19 @@
   height: 34px;
   margin: 0 auto;
   border-radius: 50%;
-  background: #2563eb;
+  background: var(--accent-blue);
   color: #fff;
   font-size: 0.8rem;
   font-weight: 700;
-  border: 3px solid #fff;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+  border: 3px solid var(--bg-card);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 .book-parking-pin.active .book-parking-pin-bubble {
-  background: #16a34a;
+  background: var(--success);
   width: 38px;
   height: 38px;
-  box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.35);
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.35);
 }
 
 .book-parking-popup {
@@ -387,10 +387,10 @@
   z-index: 3;
   width: min(220px, 85%);
   padding: 1rem;
-  background: #ffffff;
+  background: var(--bg-card);
   border-radius: 12px;
-  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.15);
-  border: 1px solid #e8eef4;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-subtle);
   transform: translate(-50%, calc(-100% - 20px));
   text-align: left;
 }
@@ -398,19 +398,19 @@
 .book-parking-popup-title {
   font-size: 0.9375rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-primary);
   margin: 0 0 0.35rem 0;
 }
 
 .book-parking-popup-dist {
   font-size: 0.75rem;
-  color: #64748b;
+  color: var(--text-muted);
   margin: 0 0 0.25rem 0;
 }
 
 .book-parking-popup-spots {
   font-size: 0.8125rem;
-  color: #16a34a;
+  color: var(--success);
   font-weight: 600;
   margin: 0 0 0.75rem 0;
 }
@@ -420,7 +420,7 @@
   padding: 0.5rem;
   border: none;
   border-radius: 8px;
-  background: #2563eb;
+  background: var(--accent-blue);
   color: #fff;
   font-weight: 600;
   font-size: 0.8125rem;
@@ -428,7 +428,7 @@
 }
 
 .book-parking-popup-btn:hover {
-  background: #1d4ed8;
+  filter: brightness(1.08);
 }
 
 /* Bottom row */
@@ -460,10 +460,10 @@
   align-items: center;
   gap: 1rem;
   padding: 1.25rem;
-  background: #ffffff;
-  border: 1px solid #e8eef4;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   border-radius: 16px;
-  box-shadow: 0 2px 16px rgba(15, 23, 42, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .book-parking-bottom-text {
@@ -474,13 +474,13 @@
 .book-parking-bottom-title {
   font-size: 1rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary);
   margin: 0 0 0.25rem 0;
 }
 
 .book-parking-bottom-meta {
   font-size: 0.875rem;
-  color: #64748b;
+  color: var(--text-muted);
   margin: 0;
 }
 

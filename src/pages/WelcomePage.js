@@ -70,7 +70,7 @@ const WelcomePage = () => {
 
   return (
     <div className="welcome-page">
-      <Navbar variant="landing" showAuthLinks />
+      <Navbar showAuthLinks />
       <main className="welcome-main">
         <section className="welcome-hero">
           <div className="welcome-hero-copy">

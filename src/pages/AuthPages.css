@@ -208,39 +208,6 @@
   color: var(--accent-purple);
 }
 
-/* Subtle gatekeeper link at bottom */
-.auth-role-toggle {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-subtle);
-  text-align: center;
-}
-
-.auth-role-toggle button {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 13px;
-  cursor: pointer;
-  padding: 4px 8px;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-.auth-role-toggle button:hover {
-  color: var(--logo-blue-light);
-}
-
-.auth-role-toggle .role-badge-small {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  font-size: 11px;
-  background: rgba(139, 92, 246, 0.2);
-  color: var(--accent-purple);
-}
-
 .loading {
   display: flex;
   align-items: center;

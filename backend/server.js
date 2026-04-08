@@ -10,20 +10,33 @@ app.use(express.json());
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
-/** $/hour — new bookings and voluntary “add 1 hour” */
+// -------------------- PAYMOB (Visa/Mastercard) --------------------
+// Safe to register even if env isn't set; frontend will detect via /paymob/config
+try {
+  const { registerPaymobRoutes } = require("./paymobRoutes");
+  registerPaymobRoutes(app);
+} catch (e) {
+  console.warn("Paymob routes not loaded:", e?.message || e);
+}
+
+/** EGP per hour — new bookings and voluntary “add 1 hour” */
 const PARKING_HOURLY_RATE = Number(process.env.PARKING_HOURLY_RATE) || 5;
-/** $/hour for staying past end_time without extending — charged at gate checkout (per full hour, rounded up). Defaults to PARKING_HOURLY_RATE. */
+/** EGP per hour for staying past end_time without extending — charged at gate checkout (per full hour, rounded up). Defaults to PARKING_HOURLY_RATE. */
 const OVERSTAY_HOURLY_RATE = Number(process.env.OVERSTAY_HOURLY_RATE) || PARKING_HOURLY_RATE;
 /** Earliest check-in before scheduled start_time */
 const EARLY_CHECKIN_MINUTES = Number(process.env.EARLY_CHECKIN_MINUTES) || 60;
-/** After start_time + this many minutes, confirmed bookings become no_show (if not checked in) */
-const ARRIVAL_WINDOW_MINUTES = Number(process.env.ARRIVAL_WINDOW_MINUTES) || 60;
+/**
+ * After scheduled start_time + this many minutes, if the gatekeeper has not scanned QR for check-in,
+ * the reservation is cancelled and the slot is freed (same as user cancel).
+ * Set ARRIVAL_WINDOW_MINUTES in backend/.env to override (default 20).
+ */
+const ARRIVAL_WINDOW_MINUTES = Number(process.env.ARRIVAL_WINDOW_MINUTES) || 20;
 
-/** Mark late arrivals as no-show and free slots (call inside a transaction). */
+/** Mark missed check-ins as cancelled and free slots (call inside a transaction). */
 async function sweepNoShows(client) {
   const swept = await client.query(
     `UPDATE reservations
-     SET status = 'no_show'
+     SET status = 'cancelled'
      WHERE status = 'confirmed'
        AND NOW() > start_time + ($1 * INTERVAL '1 minute')
      RETURNING slot_no`,
@@ -34,6 +47,21 @@ async function sweepNoShows(client) {
       `UPDATE parking_slots SET state = 0, updated_at = NOW() WHERE slot_no = $1`,
       [row.slot_no]
     );
+  }
+}
+
+/** Run sweep outside an existing transaction (e.g. GET handlers, timers). */
+async function runSweepNoShows() {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await sweepNoShows(client);
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error("[ParkGo] sweep missed check-ins:", err);
+  } finally {
+    client.release();
   }
 }
 
@@ -196,6 +224,7 @@ app.post("/auth/google", async (req, res) => {
 /* -------------------- SLOTS (parking_slots) -------------------- */
 app.get("/slots", async (req, res) => {
   try {
+    await runSweepNoShows();
     const r = await pool.query(
       `SELECT slot_no, state
        FROM parking_slots
@@ -225,6 +254,7 @@ app.post("/reservations", async (req, res) => {
     }
 
     await client.query("BEGIN");
+    await sweepNoShows(client);
 
     let slotRes;
     if (requestedSlot) {
@@ -296,6 +326,8 @@ app.post("/reservations", async (req, res) => {
 app.get("/reservations/user/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
+
+    await runSweepNoShows();
 
     const r = await pool.query(
       `SELECT r.*
@@ -632,7 +664,7 @@ app.post("/reservations/:id/overstay-extend", async (req, res) => {
       ok: true,
       reservation: up.rows[0],
       addedAmount: PARKING_HOURLY_RATE,
-      message: `Added 1 hour. +$${PARKING_HOURLY_RATE.toFixed(2)} to your total.`,
+      message: `Added 1 hour. +${PARKING_HOURLY_RATE.toFixed(2)} EGP to your total.`,
     });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -751,7 +783,7 @@ app.post("/gate/check-in", async (req, res) => {
       await client.query("ROLLBACK");
       return res.status(400).json({
         ok: false,
-        error: "Arrival window has passed. Booking may be marked as no-show.",
+        error: `Check-in window ended (${ARRIVAL_WINDOW_MINUTES} min after your scheduled start). The reservation may have been cancelled and the slot released.`,
       });
     }
 
@@ -903,7 +935,16 @@ async function ensureAdmin() {
 }
 
 const PORT = process.env.PORT || 5000;
+/** How often to cancel confirmed bookings that missed the check-in window (frees slots without waiting for HTTP traffic). */
+const MISSED_CHECKIN_SWEEP_MS = Number(process.env.MISSED_CHECKIN_SWEEP_MS) || 60_000;
+
 app.listen(PORT, async () => {
   await ensureAdmin();
-  console.log(`API running on http://localhost:${PORT}`);
+  await runSweepNoShows();
+  setInterval(() => {
+    runSweepNoShows();
+  }, MISSED_CHECKIN_SWEEP_MS);
+  console.log(
+    `API running on http://localhost:${PORT} (check-in deadline after start: ${ARRIVAL_WINDOW_MINUTES} min, sweep every ${MISSED_CHECKIN_SWEEP_MS / 1000}s)`
+  );
 });

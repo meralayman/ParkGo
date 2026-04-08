@@ -4,11 +4,10 @@ import Navbar from '../components/Navbar';
 import AlexandriaParkingGrid from '../components/AlexandriaParkingGrid';
 import { LOT_NAME } from '../constants/alexandriaLot';
 import { PARKGO_PENDING_SLOT_KEY } from '../constants/pendingSlot';
+import { API_BASE } from '../config/apiBase';
 import './ParkingSlotsPage.css';
 
 export { ALEXANDRIA_LOT_PATH, LOT_NAME } from '../constants/alexandriaLot';
-
-const API_BASE = 'http://localhost:5000';
 
 const ParkingSlotsPage = () => {
   const [slots, setSlots] = useState([]);
@@ -69,7 +68,7 @@ const ParkingSlotsPage = () => {
 
   return (
     <div className="parking-slots-page">
-      <Navbar variant="landing" showAuthLinks />
+      <Navbar showAuthLinks />
 
       <main className="parking-slots-main">
         <nav className="parking-slots-breadcrumb" aria-label="Breadcrumb">

@@ -37,7 +37,7 @@ const BookParkingPage = () => {
 
   return (
     <div className="book-parking-page">
-      <Navbar variant="landing" showAuthLinks />
+      <Navbar showAuthLinks />
 
       <main className="book-parking-main">
         <header className="book-parking-hero">

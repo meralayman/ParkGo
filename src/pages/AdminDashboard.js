@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNotifier } from '../context/NotifierContext';
 import Navbar from '../components/Navbar';
 import './Dashboard.css';
+import { formatEgp } from '../utils/formatEgp';
 
-const API_BASE = 'http://localhost:5000';
+import { API_BASE } from '../config/apiBase';
 
 const SLOT_STATES = { 0: 'Available', 1: 'Occupied', 2: 'Reserved' };
 
@@ -114,9 +116,9 @@ const AdminDashboard = () => {
       });
       const data = await res.json();
       if (data.ok) loadSlots();
-      else alert(data.error || 'Failed to update slot');
+      else toast(data.error || 'Failed to update slot', { variant: 'error' });
     } catch (e) {
-      alert('Network error. Is the backend running?');
+      toast('Network error. Is the backend running?', { variant: 'error' });
     }
   };
 
@@ -136,10 +138,10 @@ const AdminDashboard = () => {
         setShowAddSlotModal(false);
         loadSlots();
       } else {
-        alert(data.error || 'Failed to add slot');
+        toast(data.error || 'Failed to add slot', { variant: 'error' });
       }
     } catch {
-      alert('Network error. Is the backend running?');
+      toast('Network error. Is the backend running?', { variant: 'error' });
     }
   };
 
@@ -164,7 +166,7 @@ const AdminDashboard = () => {
   const handleAddAccount = async () => {
     const body = toApiUser();
     if (!body.password) {
-      alert('Password is required');
+      toast('Password is required', { variant: 'error' });
       return;
     }
     try {
@@ -179,10 +181,10 @@ const AdminDashboard = () => {
         resetForm();
         setShowAddModal(false);
       } else {
-        alert(data.error || 'Failed to create user');
+        toast(data.error || 'Failed to create user', { variant: 'error' });
       }
     } catch {
-      alert('Network error. Is the backend running?');
+      toast('Network error. Is the backend running?', { variant: 'error' });
     }
   };
 
@@ -204,22 +206,31 @@ const AdminDashboard = () => {
         setEditingAccount(null);
         setShowAddModal(false);
       } else {
-        alert(data.error || 'Failed to update user');
+        toast(data.error || 'Failed to update user', { variant: 'error' });
       }
     } catch {
-      alert('Network error. Is the backend running?');
+      toast('Network error. Is the backend running?', { variant: 'error' });
     }
   };
 
   const handleDeleteAccount = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Delete user?',
+      message: 'Are you sure you want to delete this user? This cannot be undone.',
+      confirmLabel: 'Delete',
+      cancelLabel: 'Cancel',
+      danger: true,
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`${API_BASE}/admin/users/${id}`, { method: 'DELETE' });
       const data = await res.json();
-      if (data.ok) loadUsers();
-      else alert(data.error || 'Failed to delete user');
+      if (data.ok) {
+        loadUsers();
+        toast('User deleted.', { variant: 'success' });
+      } else toast(data.error || 'Failed to delete user', { variant: 'error' });
     } catch {
-      alert('Network error. Is the backend running?');
+      toast('Network error. Is the backend running?', { variant: 'error' });
     }
   };
 
@@ -453,14 +464,14 @@ const AdminDashboard = () => {
               </div>
               <div className="stat-card">
                 <h3>Total Revenue</h3>
-                <p className="stat-value">{paymentSummary.totalRevenue.toFixed(2)}</p>
+                <p className="stat-value">{formatEgp(paymentSummary.totalRevenue)}</p>
               </div>
               {Object.entries(paymentSummary.byMethod).length > 0 && (
                 <div className="stat-card">
                   <h3>By payment method</h3>
                   <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-muted)', fontSize: 14 }}>
                     {Object.entries(paymentSummary.byMethod).map(([method, amount]) => (
-                      <li key={method}>{method}: {Number(amount).toFixed(2)}</li>
+                      <li key={method}>{method}: {formatEgp(amount)}</li>
                     ))}
                   </ul>
                 </div>
@@ -500,7 +511,7 @@ const AdminDashboard = () => {
                             <span className={`status-badge status-${r.status}`}>{r.status}</span>
                           </td>
                           <td>{r.payment_method || '—'}</td>
-                          <td>{r.total_amount != null ? Number(r.total_amount).toFixed(2) : '—'}</td>
+                          <td>{r.total_amount != null ? formatEgp(r.total_amount) : '—'}</td>
                         </tr>
                       ))
                     )}
@@ -661,14 +672,14 @@ const AdminDashboard = () => {
                     </div>
                     <div className="stat-card">
                       <h3>Total spent</h3>
-                      <p className="stat-value">{Number(userHistoryData.paymentSummary.totalSpent).toFixed(2)}</p>
+                      <p className="stat-value">{formatEgp(userHistoryData.paymentSummary.totalSpent)}</p>
                     </div>
                     {Object.keys(userHistoryData.paymentSummary.byMethod || {}).length > 0 && (
                       <div className="stat-card">
                         <h3>By payment method</h3>
                         <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-muted)', fontSize: 14 }}>
                           {Object.entries(userHistoryData.paymentSummary.byMethod).map(([method, amount]) => (
-                            <li key={method}>{method}: {Number(amount).toFixed(2)}</li>
+                            <li key={method}>{method}: {formatEgp(amount)}</li>
                           ))}
                         </ul>
                       </div>
@@ -703,7 +714,7 @@ const AdminDashboard = () => {
                             <td>{new Date(r.end_time).toLocaleString()}</td>
                             <td><span className={`status-badge status-${r.status}`}>{r.status}</span></td>
                             <td>{r.payment_method || '—'}</td>
-                            <td>{r.total_amount != null ? Number(r.total_amount).toFixed(2) : '—'}</td>
+                            <td>{r.total_amount != null ? formatEgp(r.total_amount) : '—'}</td>
                           </tr>
                         ))
                       )}

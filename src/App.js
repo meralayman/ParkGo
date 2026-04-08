@@ -1,7 +1,8 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './context/AuthContext';
+import { NotifierProvider } from './context/NotifierContext';
 import WelcomePage from './pages/WelcomePage';
 import BookParkingPage from './pages/BookParkingPage';
 import ParkingSlotsPage from './pages/ParkingSlotsPage';
@@ -9,6 +10,7 @@ import SmartLayoutDesignerPage from './pages/SmartLayoutDesignerPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import PaymentPage from './pages/PaymentPage';
+import PaymentReturnPage from './pages/PaymentReturnPage';
 import AdminDashboard from './pages/AdminDashboard';
 import UserDashboard from './pages/UserDashboard';
 import GatekeeperDashboard from './pages/GatekeeperDashboard';
@@ -18,10 +20,8 @@ import './App.css';
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 
 function AppRoutes() {
-  const { pathname } = useLocation();
-  const isLightShell = pathname === '/' || pathname.startsWith('/book-parking');
   return (
-    <div className={`App${isLightShell ? ' App--landing' : ''}`}>
+    <div className="App">
       <Routes>
         <Route path="/" element={<WelcomePage />} />
         <Route path="/book-parking" element={<BookParkingPage />} />
@@ -31,6 +31,7 @@ function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
+        <Route path="/payment/return" element={<ProtectedRoute><PaymentReturnPage /></ProtectedRoute>} />
         <Route
           path="/admin/*"
           element={
@@ -62,11 +63,13 @@ function AppRoutes() {
 
 function App() {
   const appContent = (
-    <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
-    </AuthProvider>
+    <NotifierProvider>
+      <AuthProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </AuthProvider>
+    </NotifierProvider>
   );
 
   if (GOOGLE_CLIENT_ID) {

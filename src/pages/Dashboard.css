@@ -184,6 +184,37 @@
   line-height: 1.45;
 }
 
+/* Urgent: approaching auto-cancel if not scanned in at gate (matches ARRIVAL_WINDOW) */
+.checkin-deadline-panel {
+  margin-bottom: 1.5rem;
+}
+
+.checkin-deadline-card {
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.22) 0%, rgba(30, 41, 59, 0.96) 100%);
+  border: 1px solid rgba(251, 191, 36, 0.55);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  max-width: 720px;
+}
+
+.checkin-deadline-title {
+  margin: 0 0 0.75rem 0;
+  color: #fcd34d;
+  font-size: 1.1rem;
+}
+
+.checkin-deadline-text {
+  margin: 0;
+  color: var(--text-muted);
+  line-height: 1.55;
+  font-size: 0.95rem;
+}
+
+.checkin-deadline-countdown {
+  color: #fde68a;
+  font-variant-numeric: tabular-nums;
+}
+
 .parking-overview-hint {
   color: var(--text-muted);
   font-size: 0.95rem;
@@ -706,7 +737,8 @@
   display: flex;
   justify-content: center;
   padding: 24px;
-  background: #fff;
+  /* Light well so QR modules stay scannable on camera */
+  background: #e2e8f0;
   border-radius: 12px;
   margin-bottom: 20px;
 }
@@ -785,10 +817,12 @@
 
 .gatekeeper-qr-reader {
   max-width: 400px;
+  min-height: 240px;
   margin: 0 auto 16px auto;
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid var(--border-subtle);
+  background: rgba(0, 0, 0, 0.25);
 }
 
 .gatekeeper-qr-reader video {

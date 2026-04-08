@@ -1,14 +1,20 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useNotifier } from '../context/NotifierContext';
 import Navbar from '../components/Navbar';
 import AlexandriaParkingGrid from '../components/AlexandriaParkingGrid';
 import { LOT_NAME } from '../constants/alexandriaLot';
 import { PARKGO_PENDING_SLOT_KEY } from '../constants/pendingSlot';
+import { formatEgp } from '../utils/formatEgp';
 import './Dashboard.css';
 import { QRCodeCanvas } from "qrcode.react";
 
-const API_BASE = 'http://localhost:5000';
+import { API_BASE } from '../config/apiBase';
+import {
+  CHECK_IN_DEADLINE_MINUTES,
+  CHECK_IN_WARNING_LEAD_MINUTES,
+} from '../constants/checkInDeadline';
 
 /** Match backend PARKING_HOURLY_RATE (extend button) */
 const HOURLY_RATE = 5;
@@ -19,6 +25,7 @@ const OVERSTAY_RATE_DISPLAY =
 const UserDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast, confirm } = useNotifier();
 
   const [reservations, setReservations] = useState([]);
   const [history, setHistory] = useState([]);
@@ -152,7 +159,7 @@ const UserDashboard = () => {
 
   const handleCreateReservation = async () => {
     if (!reservationData.date || !reservationData.time || !reservationData.duration) {
-      alert('Please fill in date, time, and duration');
+      toast('Please fill in date, time, and duration', { variant: 'error' });
       return;
     }
 
@@ -180,6 +187,7 @@ const UserDashboard = () => {
             endTime: endTime.toISOString(),
             totalAmount,
             slotNo: pendingSlotNo || undefined,
+            paymentAttempt: Date.now(),
           },
         },
       });
@@ -202,7 +210,7 @@ const UserDashboard = () => {
 
       const data = await res.json();
       if (!data.ok) {
-        alert(data.error || 'Failed to create reservation');
+        toast(data.error || 'Failed to create reservation', { variant: 'error' });
         return;
       }
 
@@ -219,11 +227,12 @@ const UserDashboard = () => {
         paymentMethod: 'cash'
       });
 
-      alert(
-        `Reservation created ✅\nSlot: ${data.reservation.slot_no}\nBooking ID: ${data.reservation.id}\nThe QR encodes PARKGO|V1|${data.reservation.id} for the gate scanner.`
+      toast(
+        `Reservation created\nSlot: ${data.reservation.slot_no}\nBooking ID: ${data.reservation.id}\nShow your booking QR at the gate (ID ${data.reservation.id}).`,
+        { variant: 'success', duration: 9000 }
       );
     } catch (err) {
-      alert(err.message || 'Cannot reach server');
+      toast(err.message || 'Cannot reach server', { variant: 'error' });
     }
   };
 
@@ -239,6 +248,63 @@ const UserDashboard = () => {
 
   const [overstayActionLoading, setOverstayActionLoading] = useState(false);
 
+  /** Live clock for check-in deadline countdown (confirmed bookings only) */
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const checkInAlertedRef = useRef(new Set());
+
+  const formatMsAsCountdown = (ms) => {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    if (m <= 0) return `${sec} second${sec !== 1 ? 's' : ''}`;
+    return `${m} min ${sec.toString().padStart(2, '0')} sec`;
+  };
+
+  /** Confirmed bookings within the final warning window before auto-cancel (no gate scan). */
+  const checkInUrgentWarnings = useMemo(() => {
+    const now = nowTick;
+    const windowMs = CHECK_IN_DEADLINE_MINUTES * 60 * 1000;
+    const warnMs = CHECK_IN_WARNING_LEAD_MINUTES * 60 * 1000;
+    const out = [];
+    for (const r of reservations) {
+      if (r.status !== 'confirmed') continue;
+      const startMs = new Date(r.date).getTime();
+      const deadlineMs = startMs + windowMs;
+      const msLeft = deadlineMs - now;
+      if (msLeft > 0 && msLeft <= warnMs) {
+        out.push({
+          id: r.id,
+          parkingSpot: r.parkingSpot,
+          msLeft,
+          deadlineMs,
+        });
+      }
+    }
+    return out;
+  }, [reservations, nowTick]);
+
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const hasConfirmed = reservations.some((r) => r.status === 'confirmed');
+    if (!hasConfirmed) return undefined;
+    const t = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [user?.id, reservations]);
+
+  useEffect(() => {
+    checkInUrgentWarnings.forEach((w) => {
+      if (checkInAlertedRef.current.has(w.id)) return;
+      checkInAlertedRef.current.add(w.id);
+      const mins = Math.max(1, Math.ceil(w.msLeft / 60000));
+      toast(
+        `Urgent: check in at the gate soon.\n\nBooking #${w.id} (spot ${w.parkingSpot}): about ${mins} minute${
+          mins !== 1 ? 's' : ''
+        } left before this reservation is cancelled if you are not scanned in.`,
+        { variant: 'warning', duration: 12000 }
+      );
+    });
+  }, [checkInUrgentWarnings, toast]);
+
   const handleOverstayExtend = async (reservationId) => {
     if (!user?.id) return;
     setOverstayActionLoading(true);
@@ -250,14 +316,14 @@ const UserDashboard = () => {
       });
       const data = await res.json();
       if (!data.ok) {
-        alert(data.error || 'Could not extend reservation');
+        toast(data.error || 'Could not extend reservation', { variant: 'error' });
         return;
       }
       await loadReservationsAndHistory();
       await loadSlots();
-      alert(data.message || 'Reservation extended by 1 hour.');
+      toast(data.message || 'Reservation extended by 1 hour.', { variant: 'success' });
     } catch (err) {
-      alert(err.message || 'Cannot reach server');
+      toast(err.message || 'Cannot reach server', { variant: 'error' });
     } finally {
       setOverstayActionLoading(false);
     }
@@ -272,21 +338,29 @@ const UserDashboard = () => {
   }, [user?.id]);
 
   const handleCancelReservation = async (id) => {
-    if (!window.confirm('Are you sure you want to cancel this reservation?')) return;
+    const ok = await confirm({
+      title: 'Cancel reservation?',
+      message: 'Are you sure you want to cancel this reservation? The spot will be released for others.',
+      confirmLabel: 'Yes, cancel',
+      cancelLabel: 'Keep booking',
+      danger: true,
+    });
+    if (!ok) return;
 
     try {
       const res = await fetch(`${API_BASE}/reservations/${id}/cancel`, { method: 'PATCH' });
       const data = await res.json();
 
       if (!data.ok) {
-        alert(data.error || 'Failed to cancel reservation');
+        toast(data.error || 'Failed to cancel reservation', { variant: 'error' });
         return;
       }
 
       await loadReservationsAndHistory();
       await loadSlots();
+      toast('Reservation cancelled.', { variant: 'success' });
     } catch (err) {
-      alert(err.message || 'Cannot reach server');
+      toast(err.message || 'Cannot reach server', { variant: 'error' });
     }
   };
 
@@ -301,6 +375,23 @@ const UserDashboard = () => {
       </header>
 
       <div className="dashboard-content">
+        {checkInUrgentWarnings.length > 0 && (
+          <div className="checkin-deadline-panel" role="alert" aria-live="polite">
+            {checkInUrgentWarnings.map((w) => (
+              <div key={w.id} className="checkin-deadline-card">
+                <h3 className="checkin-deadline-title">Check in soon — reservation at risk</h3>
+                <p className="checkin-deadline-text">
+                  Booking <strong>#{w.id}</strong> (spot <strong>{w.parkingSpot}</strong>): the gate must scan your QR
+                  before{' '}
+                  <strong>{new Date(w.deadlineMs).toLocaleString()}</strong> — about{' '}
+                  <strong className="checkin-deadline-countdown">{formatMsAsCountdown(w.msLeft)}</strong> left. After
+                  that, this booking may be cancelled and the spot released.
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
         {overdueReservations.length > 0 && (
           <div className="overstay-panel" role="region" aria-label="Parking time ended">
             {overdueReservations.map((ov) => (
@@ -309,7 +400,7 @@ const UserDashboard = () => {
                 <p className="overstay-text">
                   Spot <strong>{ov.parkingSpot}</strong> — your booking ended at{' '}
                   <strong>{new Date(ov.endTime).toLocaleString()}</strong>. Add another hour below if you need more time.
-                  If you leave without extending, extra fees apply: <strong>${OVERSTAY_RATE_DISPLAY.toFixed(2)} per hour</strong> for each full hour past your end time (rounded up), added when you scan out at the gate.
+                  If you leave without extending, extra fees apply: <strong>{OVERSTAY_RATE_DISPLAY.toFixed(2)} EGP per hour</strong> for each full hour past your end time (rounded up), added when you scan out at the gate.
                 </p>
                 <div className="overstay-actions">
                   <button
@@ -318,7 +409,7 @@ const UserDashboard = () => {
                     disabled={overstayActionLoading}
                     onClick={() => handleOverstayExtend(ov.id)}
                   >
-                    {`Add 1 more hour (+$${HOURLY_RATE.toFixed(2)})`}
+                    {`Add 1 more hour (+${HOURLY_RATE.toFixed(2)} EGP)`}
                   </button>
                 </div>
               </div>
@@ -378,7 +469,11 @@ const UserDashboard = () => {
           <div className="dashboard-section">
             <h2>Current bookings</h2>
             <p className="parking-overview-hint" style={{ marginBottom: '0.75rem' }}>
-              QR codes contain your <strong>booking ID</strong> only — show at entry (check-in) and exit (check-out).
+              QR codes contain your <strong>booking ID</strong> only — show at entry (check-in) and exit (check-out).{' '}
+              After your scheduled start time, the gate must scan you in within{' '}
+              <strong>{CHECK_IN_DEADLINE_MINUTES} minutes</strong> or the reservation is cancelled and the spot is
+              released. You get a dashboard alert and banner in the last{' '}
+              <strong>{CHECK_IN_WARNING_LEAD_MINUTES} minutes</strong> before that deadline.
             </p>
             <div className="table-container">
               {reservations.length === 0 ? (
@@ -411,7 +506,7 @@ const UserDashboard = () => {
                         <td>{new Date(reservation.date).toLocaleDateString()}</td>
                         <td>{reservation.time}</td>
                         <td>{reservation.duration}</td>
-                        <td>${reservation.totalAmount?.toFixed(2) || '0.00'}</td>
+                        <td>{formatEgp(reservation.totalAmount)}</td>
                         <td>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
                             <QRCodeCanvas value={String(reservation.id)} size={90} />
@@ -473,7 +568,7 @@ const UserDashboard = () => {
                         <td>{new Date(item.date).toLocaleDateString()}</td>
                         <td>{item.time}</td>
                         <td>{item.duration} hours</td>
-                        <td>${item.totalAmount?.toFixed(2) || '0.00'}</td>
+                        <td>{formatEgp(item.totalAmount)}</td>
                         <td>
                           <span className={`status-badge status-${item.status}`}>
                             {item.status}
@@ -495,7 +590,7 @@ const UserDashboard = () => {
           <div className="modal-content exit-qr-modal" onClick={(e) => e.stopPropagation()}>
             <h2>Pay cash &amp; show booking QR</h2>
             <p className="exit-qr-instruction">
-              Pay <strong>${exitQRReservation.totalAmount?.toFixed(2) || '0.00'}</strong> cash to the gatekeeper. Show this QR for <strong>check-out</strong> — final amount is calculated at exit.
+              Pay <strong>{formatEgp(exitQRReservation.totalAmount)}</strong> cash to the gatekeeper. Show this QR for <strong>check-out</strong> — final amount is calculated at exit.
             </p>
             <div className="exit-qr-code-wrap">
               <QRCodeCanvas value={String(exitQRReservation.id)} size={220} />
@@ -587,7 +682,7 @@ const UserDashboard = () => {
                     onChange={handleReservationChange}
                   >
                     <option value="cash">Cash</option>
-                    <option value="card">Card</option>
+                    <option value="card">Card (Paymob)</option>
                   </select>
                 </div>
 
@@ -595,7 +690,7 @@ const UserDashboard = () => {
                   <label>Total Amount</label>
                   <input
                     type="text"
-                    value={`$${(parseFloat(reservationData.duration) * 5).toFixed(2)}`}
+                    value={formatEgp((parseFloat(reservationData.duration) || 0) * 5)}
                     disabled
                     style={{ background: '#f5f5f5' }}
                   />

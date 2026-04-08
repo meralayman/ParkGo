@@ -1,11 +1,28 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import "./Dashboard.css";
+import { formatEgp } from "../utils/formatEgp";
 
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "../config/apiBase";
+import { CHECK_IN_DEADLINE_MINUTES } from "../constants/checkInDeadline";
+
 const QR_READER_ID = "gatekeeper-qr-reader";
+
+/** html5-qrcode throws if stop() runs when the scanner was never started or already stopped. */
+function safeStopHtml5Qrcode(scanner) {
+  if (!scanner || typeof scanner.stop !== "function") return;
+  try {
+    if (!scanner.isScanning) return;
+    const out = scanner.stop();
+    if (out && typeof out.then === "function") {
+      out.catch(() => {});
+    }
+  } catch {
+    /* sync throw from stop() */
+  }
+}
 
 const GatekeeperDashboard = () => {
   const { user } = useAuth();
@@ -18,15 +35,7 @@ const GatekeeperDashboard = () => {
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState("");
   const scannerRef = useRef(null);
-
-  useEffect(() => {
-    return () => {
-      const scanner = scannerRef.current;
-      if (scanner && typeof scanner.stop === "function") {
-        scanner.stop().catch(() => {});
-      }
-    };
-  }, []);
+  const loadBookingRef = useRef(async () => {});
 
   const parseBookingId = (raw) => {
     const t = String(raw ?? "").trim();
@@ -34,7 +43,7 @@ const GatekeeperDashboard = () => {
     return Number.isNaN(n) ? null : n;
   };
 
-  const loadBooking = async (rawInput) => {
+  const loadBooking = useCallback(async (rawInput) => {
     const bookingId = parseBookingId(rawInput);
     if (bookingId == null) {
       setStatusMsg("Please enter a valid booking ID (number from the QR).");
@@ -72,7 +81,9 @@ const GatekeeperDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  loadBookingRef.current = loadBooking;
 
   const doCheckIn = async () => {
     const bookingId = parseBookingId(token);
@@ -122,7 +133,7 @@ const GatekeeperDashboard = () => {
         return;
       }
       setStatusMsg(
-        `✅ ${data.message} (slot ${data.slotNo}) — total $${Number(data.totalAmount).toFixed(2)}`
+        `✅ ${data.message} (slot ${data.slotNo}) — total ${formatEgp(data.totalAmount)}`
       );
       setReservation(null);
       setNextAction(null);
@@ -134,59 +145,126 @@ const GatekeeperDashboard = () => {
     }
   };
 
-  const startCamera = async () => {
+  /**
+   * Start camera after React has painted the reader div (initializing Html5Qrcode while the node was still
+   * display:none caused failures). Falls back to the first listed camera if "environment" is unavailable.
+   */
+  useEffect(() => {
+    if (!cameraActive) return undefined;
+
+    let cancelled = false;
+    let instance = null;
+
+    const scanConfig = {
+      fps: 10,
+      qrbox: (viewfinderWidth, viewfinderHeight) => {
+        const edge = Math.min(viewfinderWidth, viewfinderHeight);
+        const s = Math.max(120, Math.min(280, Math.floor(edge * 0.65)));
+        return { width: s, height: s };
+      },
+      aspectRatio: 1,
+      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+    };
+
+    const startScanner = async () => {
+      await new Promise((r) => {
+        requestAnimationFrame(() => requestAnimationFrame(r));
+      });
+      if (cancelled) return;
+
+      if (!document.getElementById(QR_READER_ID)) {
+        setCameraError("Scanner area not ready. Try again.");
+        setCameraActive(false);
+        return;
+      }
+
+      try {
+        instance = new Html5Qrcode(QR_READER_ID);
+
+        const onScanSuccess = (decodedText) => {
+          const trimmed = String(decodedText ?? "").trim();
+          const finish = () => {
+            setCameraActive(false);
+            setToken(trimmed);
+            loadBookingRef.current(trimmed);
+          };
+          const current = instance;
+          if (current?.isScanning) {
+            try {
+              const p = current.stop();
+              if (p && typeof p.then === "function") {
+                p.then(finish).catch(finish);
+              } else {
+                finish();
+              }
+            } catch {
+              finish();
+            }
+          } else {
+            finish();
+          }
+        };
+
+        const startWithDevice = async (cameraIdOrConfig) => {
+          await instance.start(cameraIdOrConfig, scanConfig, onScanSuccess, () => {});
+        };
+
+        try {
+          await startWithDevice({ facingMode: "environment" });
+        } catch {
+          if (cancelled) return;
+          try {
+            if (typeof instance.clear === "function") instance.clear();
+          } catch {
+            /* ignore */
+          }
+          instance = new Html5Qrcode(QR_READER_ID);
+          const devices = await Html5Qrcode.getCameras();
+          if (!devices?.length) {
+            throw new Error("No camera found. Connect a webcam or allow camera access.");
+          }
+          await instance.start(devices[0].id, scanConfig, onScanSuccess, () => {});
+        }
+
+        if (cancelled) {
+          safeStopHtml5Qrcode(instance);
+          return;
+        }
+        scannerRef.current = instance;
+        setStatusMsg("Point the camera at the customer's booking QR (booking ID).");
+      } catch (err) {
+        if (!cancelled) {
+          setCameraError(
+            err?.message ||
+              "Could not start camera. Allow camera access and use HTTPS or localhost."
+          );
+          setCameraActive(false);
+        }
+        scannerRef.current = null;
+      }
+    };
+
+    startScanner();
+
+    return () => {
+      cancelled = true;
+      const s = scannerRef.current;
+      scannerRef.current = null;
+      safeStopHtml5Qrcode(s);
+      safeStopHtml5Qrcode(instance);
+    };
+  }, [cameraActive]);
+
+  const startCamera = () => {
+    if (cameraActive) return;
     setCameraError("");
     setStatusMsg("");
-    if (scannerRef.current) return;
-
     setCameraActive(true);
-
-    try {
-      const html5QrCode = new Html5Qrcode(QR_READER_ID);
-      scannerRef.current = html5QrCode;
-
-      await html5QrCode.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 300, height: 300 },
-          aspectRatio: 1,
-          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
-        },
-        (decodedText) => {
-          if (loading) return;
-          const trimmed = decodedText.trim();
-          html5QrCode.stop().then(() => {
-            scannerRef.current = null;
-            setCameraActive(false);
-            setToken(trimmed);
-            loadBooking(trimmed);
-          }).catch(() => {
-            scannerRef.current = null;
-            setCameraActive(false);
-            setToken(trimmed);
-            loadBooking(trimmed);
-          });
-        },
-        () => {}
-      );
-      setStatusMsg("Point the camera at the customer's booking QR (booking ID).");
-    } catch (err) {
-      setCameraError(err?.message || "Could not start camera. Check permissions.");
-      setCameraActive(false);
-      scannerRef.current = null;
-      setStatusMsg("");
-    }
   };
 
-  const stopCamera = async () => {
-    if (!scannerRef.current) return;
-    try {
-      await scannerRef.current.stop();
-      setCameraActive(false);
-      setStatusMsg("");
-    } catch (e) {}
-    scannerRef.current = null;
+  const stopCamera = () => {
+    setCameraActive(false);
+    setStatusMsg("");
   };
 
   const clearAll = () => {
@@ -210,7 +288,11 @@ const GatekeeperDashboard = () => {
       <div className="dashboard-content">
         <div className="dashboard-section">
           <h2>Scan booking QR</h2>
-          <p className="gatekeeper-hint">QR contains the booking ID only. First scan = entry (check-in), second = exit (check-out).</p>
+          <p className="gatekeeper-hint">
+            QR contains the booking ID only. First scan = entry (check-in), second = exit (check-out). Check-in must
+            happen within {CHECK_IN_DEADLINE_MINUTES} minutes after the booking start time, or the reservation is
+            cancelled and the slot is freed automatically.
+          </p>
 
           <div className="gatekeeper-scanner-actions">
             {!cameraActive ? (

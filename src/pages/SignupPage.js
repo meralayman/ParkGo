@@ -15,8 +15,7 @@ const SignupPage = () => {
     username: '',
     gmail: '',
     password: '',
-    confirmPassword: '',
-    role: 'user' // 'user' or 'gatekeeper' — only these can sign up
+    confirmPassword: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -78,8 +77,8 @@ const SignupPage = () => {
 
     setLoading(true);
 
-    const { confirmPassword, ...userData } = formData;
-    const result = await signup(userData);
+    const { confirmPassword, ...rest } = formData;
+    const result = await signup({ ...rest, role: 'user' });
 
     setLoading(false);
 
@@ -213,17 +212,6 @@ const SignupPage = () => {
           <button type="submit" className="auth-button" disabled={loading}>
             {loading ? 'Creating Account...' : 'Sign Up'}
           </button>
-
-          <div className="auth-role-toggle">
-            <button
-              type="button"
-              onClick={() => setFormData((prev) => ({ ...prev, role: prev.role === 'gatekeeper' ? 'user' : 'gatekeeper' }))}
-              aria-label="Toggle staff registration"
-            >
-              {formData.role === 'gatekeeper' ? 'Registering as customer? Click to sign up as User' : 'Staff? Register as gatekeeper'}
-            </button>
-            {formData.role === 'gatekeeper' && <span className="role-badge-small">Gatekeeper</span>}
-          </div>
         </form>
 
         <p className="auth-footer">

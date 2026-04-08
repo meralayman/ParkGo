@@ -1,10 +1,10 @@
-/* First page — Smart Parking Layout reference (light, blue accents) */
+/* Welcome — matches app dark theme (tokens from index.css) */
 .welcome-page {
   width: 100%;
   min-height: 100vh;
   min-height: 100dvh;
-  background: linear-gradient(180deg, #f5f9ff 0%, #ffffff 32%, #fafafa 100%);
-  color: #1e293b;
+  background: var(--bg-dark);
+  color: var(--text-primary);
 }
 
 .welcome-main {
@@ -53,7 +53,7 @@
   font-size: clamp(1.875rem, 4.2vw, 2.75rem);
   font-weight: 700;
   line-height: 1.15;
-  color: #1e293b;
+  color: var(--text-primary);
   letter-spacing: -0.03em;
   margin: 0 0 1.125rem 0;
 }
@@ -61,7 +61,7 @@
 .welcome-subhead {
   font-size: clamp(1rem, 2.1vw, 1.125rem);
   line-height: 1.65;
-  color: #64748b;
+  color: var(--text-muted);
   margin: 0 0 1.875rem 0;
 }
 
@@ -103,33 +103,33 @@
 }
 
 .welcome-btn-primary {
-  background: #2563eb;
+  background: var(--accent-blue);
   color: #ffffff;
-  border: 2px solid #2563eb;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  border: 2px solid var(--accent-blue);
+  box-shadow: 0 4px 14px var(--glow-blue);
 }
 
 .welcome-btn-primary:hover {
-  background: #1d4ed8;
-  border-color: #1d4ed8;
+  background: var(--logo-blue-dark);
+  border-color: var(--logo-blue-dark);
   color: #ffffff;
 }
 
 .welcome-btn-secondary {
-  background: #ffffff;
-  color: #2563eb;
-  border: 2px solid #93c5fd;
+  background: transparent;
+  color: var(--logo-blue-light);
+  border: 2px solid var(--border-subtle);
 }
 
 .welcome-btn-secondary:hover {
-  background: #eff6ff;
-  border-color: #60a5fa;
-  color: #1d4ed8;
+  background: var(--nav-link-hover-bg);
+  border-color: var(--logo-blue);
+  color: #ffffff;
 }
 
 .welcome-caption {
   font-size: 0.8125rem;
-  color: #94a3b8;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -150,7 +150,8 @@
   max-width: 460px;
   height: auto;
   border-radius: 24px;
-  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.1), 0 10px 24px rgba(37, 99, 235, 0.08);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-subtle);
 }
 
 /* Two feature cards */
@@ -173,17 +174,17 @@
 }
 
 .welcome-feature-card {
-  background: #ffffff;
-  border: 1px solid #e8eef4;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
   border-radius: 18px;
   padding: 1.75rem 1.75rem 2rem;
-  box-shadow: 0 4px 28px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-sm);
   transition: box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .welcome-feature-card:hover {
-  border-color: #dbeafe;
-  box-shadow: 0 12px 40px rgba(37, 99, 235, 0.1);
+  border-color: rgba(96, 165, 250, 0.35);
+  box-shadow: var(--shadow-md);
 }
 
 .welcome-feature-icon-wrap {
@@ -194,35 +195,35 @@
   height: 72px;
   margin-bottom: 1.125rem;
   border-radius: 50%;
-  background: linear-gradient(180deg, #eff6ff 0%, #dbeafe 100%);
-  border: 1px solid #bfdbfe;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1px solid rgba(96, 165, 250, 0.25);
 }
 
 .welcome-feature-title {
   font-size: 1.1875rem;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary);
   margin: 0 0 0.5rem 0;
 }
 
 .welcome-feature-desc {
   font-size: 0.9375rem;
-  color: #64748b;
+  color: var(--text-muted);
   line-height: 1.6;
   margin: 0;
 }
 
-/* Demo video — compact so it balances the page */
+/* Demo video */
 .welcome-video-section {
   margin-top: 2.5rem;
   padding-top: 1.75rem;
-  border-top: 1px solid #e8eef4;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .welcome-video-title {
   font-size: clamp(1.1rem, 2vw, 1.25rem);
   font-weight: 700;
-  color: #1e293b;
+  color: var(--text-primary);
   text-align: center;
   margin: 0 0 1rem 0;
 }
@@ -232,9 +233,9 @@
   margin: 0 auto;
   border-radius: 12px;
   overflow: hidden;
-  background: #0f172a;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-md);
 }
 
 .welcome-video {

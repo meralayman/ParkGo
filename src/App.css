@@ -5,17 +5,6 @@
   color: var(--text-primary);
 }
 
-/* Home / landing — light shell (matches Smart Parking Layout reference) */
-.App--landing {
-  background: #ffffff;
-  color: #0f172a;
-}
-
-html:has(.App--landing),
-body:has(.App--landing) {
-  background: #ffffff;
-}
-
 .loading {
   display: flex;
   align-items: center;
