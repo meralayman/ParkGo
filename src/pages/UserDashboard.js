@@ -425,9 +425,15 @@ const UserDashboard = () => {
             + Make Reservation
           </button>
           <button
+            type="button"
+            onClick={() => navigate('/user/report-incident')}
+            className="btn btn-secondary"
+          >
+            Report Incident
+          </button>
+          <button
             onClick={() => { loadReservationsAndHistory(); loadSlots(); }}
             className="btn btn-secondary"
-            style={{ marginLeft: 10 }}
           >
             Refresh
           </button>

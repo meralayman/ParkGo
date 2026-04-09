@@ -7,17 +7,18 @@ import { formatEgp } from '../utils/formatEgp';
 
 import { API_BASE, safeFetchJson } from '../config/apiBase';
 
-const SLOT_STATES = { 0: 'Available', 1: 'Occupied', 2: 'Reserved' };
-
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const { toast, confirm: openConfirmDialog } = useNotifier();
   const [activeSection, setActiveSection] = useState('analytics');
   const [accounts, setAccounts] = useState([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [slots, setSlots] = useState([]);
   const [reservations, setReservations] = useState([]);
+  const [incidents, setIncidents] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [reservationsLoading, setReservationsLoading] = useState(false);
+  const [incidentsLoading, setIncidentsLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAccount, setEditingAccount] = useState(null);
   const [userHistoryUserId, setUserHistoryUserId] = useState(null);
@@ -82,6 +83,10 @@ const AdminDashboard = () => {
   }, [activeSection]);
 
   useEffect(() => {
+    if (activeSection === 'incidents') loadIncidents();
+  }, [activeSection]);
+
+  useEffect(() => {
     if (userHistoryUserId) {
       setUserHistoryLoading(true);
       setUserHistoryData(null);
@@ -138,6 +143,26 @@ const AdminDashboard = () => {
     } finally {
       setReservationsLoading(false);
     }
+  };
+
+  const loadIncidents = async () => {
+    setIncidentsLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/admin/incidents`);
+      const data = await res.json();
+      if (data.ok) setIncidents(data.incidents || []);
+      else setIncidents([]);
+    } catch {
+      setIncidents([]);
+    } finally {
+      setIncidentsLoading(false);
+    }
+  };
+
+  const incidentPhotoSrc = (filename) => {
+    if (!filename) return null;
+    const base = API_BASE || '';
+    return `${base}/uploads/incidents/${encodeURIComponent(filename)}`;
   };
 
   const updateSlotState = async (slotNo, newState) => {
@@ -247,7 +272,7 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteAccount = async (id) => {
-    const ok = await confirm({
+    const ok = await openConfirmDialog({
       title: 'Delete user?',
       message: 'Are you sure you want to delete this user? This cannot be undone.',
       confirmLabel: 'Delete',
@@ -350,6 +375,13 @@ const AdminDashboard = () => {
             onClick={() => setActiveSection('reservations')}
           >
             Reservation History & Payments
+          </button>
+          <button
+            type="button"
+            className={`admin-tab ${activeSection === 'incidents' ? 'active' : ''}`}
+            onClick={() => setActiveSection('incidents')}
+          >
+            Incidents Reports
           </button>
         </div>
 
@@ -726,6 +758,104 @@ const AdminDashboard = () => {
                           <td>{r.total_amount != null ? formatEgp(r.total_amount) : '—'}</td>
                         </tr>
                       ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeSection === 'incidents' && (
+          <div className="dashboard-section">
+            <div className="admin-analytics-header" style={{ marginBottom: 16 }}>
+              <h2 style={{ margin: 0 }}>Incidents Reports</h2>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={loadIncidents} disabled={incidentsLoading}>
+                {incidentsLoading ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+            <p className="parking-overview-hint" style={{ marginTop: 0 }}>
+              All reports submitted by customers (with booking ID) and by gatekeepers. Newest first.
+            </p>
+            {incidentsLoading ? (
+              <p className="empty-state">Loading incidents…</p>
+            ) : (
+              <div className="table-container admin-incidents-table-wrap">
+                <table className="data-table admin-incidents-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Source</th>
+                      <th>Submitted</th>
+                      <th>Name (form)</th>
+                      <th>Phone</th>
+                      <th>Email</th>
+                      <th>Booking #</th>
+                      <th>Customer account</th>
+                      <th>Gatekeeper</th>
+                      <th>What happened</th>
+                      <th>Photo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {incidents.length === 0 ? (
+                      <tr>
+                        <td colSpan="11" style={{ textAlign: 'center', padding: '20px' }}>
+                          No incident reports yet
+                        </td>
+                      </tr>
+                    ) : (
+                      incidents.map((row) => {
+                        const isGk = (row.reporter_type || 'user') === 'gatekeeper';
+                        const cust =
+                          row.reporter_account_first_name || row.reporter_account_last_name
+                            ? `${row.reporter_account_first_name || ''} ${row.reporter_account_last_name || ''}`.trim() +
+                              (row.user_id ? ` (#${row.user_id})` : '')
+                            : row.user_id
+                              ? `User #${row.user_id}`
+                              : '—';
+                        const gk =
+                          row.gatekeeper_first_name || row.gatekeeper_last_name
+                            ? `${row.gatekeeper_first_name || ''} ${row.gatekeeper_last_name || ''}`.trim() +
+                              (row.gatekeeper_id ? ` (#${row.gatekeeper_id})` : '')
+                            : row.gatekeeper_id
+                              ? `#${row.gatekeeper_id}`
+                              : '—';
+                        const src = incidentPhotoSrc(row.photo_filename);
+                        return (
+                          <tr key={row.id}>
+                            <td>{row.id}</td>
+                            <td>
+                              <span
+                                className={`incident-source-badge ${isGk ? 'incident-source-gatekeeper' : 'incident-source-user'}`}
+                              >
+                                {isGk ? 'Gatekeeper' : 'User'}
+                              </span>
+                            </td>
+                            <td>{row.created_at ? new Date(row.created_at).toLocaleString() : '—'}</td>
+                            <td>{row.full_name || '—'}</td>
+                            <td>{row.mobile || '—'}</td>
+                            <td>
+                              {isGk
+                                ? row.email || '—'
+                                : row.reporter_account_email || '—'}
+                            </td>
+                            <td>{row.reservation_id != null ? row.reservation_id : '—'}</td>
+                            <td>{!isGk ? cust : '—'}</td>
+                            <td>{isGk ? gk : '—'}</td>
+                            <td className="admin-incidents-desc">{row.description || '—'}</td>
+                            <td>
+                              {src ? (
+                                <a href={src} target="_blank" rel="noopener noreferrer" title="Open image">
+                                  <img className="admin-incidents-photo" src={src} alt="" />
+                                </a>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>

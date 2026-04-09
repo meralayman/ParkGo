@@ -1,33 +1,55 @@
 /**
  * API origin for fetch calls.
  * - Set REACT_APP_API_BASE_URL in .env for production or custom backends (no trailing slash).
- * - In development, defaults to '' so requests are same-origin and CRA's package.json "proxy"
- *   forwards them to the backend (avoids CORS and some localhost IPv4/IPv6 issues).
+ * - In development, defaults to http://127.0.0.1:5000 so requests hit Express directly.
+ *   (CRA's package.json "proxy" does not reliably forward multipart POST / FormData; that produced
+ *   "Cannot POST /incidents" from the dev server. Backend uses cors() so the browser is allowed.)
  */
 function getApiBase() {
   const v = process.env.REACT_APP_API_BASE_URL;
   if (v != null && String(v).trim() !== '') {
-    return String(v).replace(/\/$/, '');
-  }
-  if (process.env.NODE_ENV === 'development') {
-    return '';
+    let u = String(v).replace(/\/$/, '');
+    // Misconfiguration: pointing the API at the CRA dev server causes "Cannot POST /incidents" (HTML error).
+    if (process.env.NODE_ENV === 'development' && /:(3000|3001)(\/|$)/.test(u)) {
+      u = 'http://127.0.0.1:5000';
+    }
+    return u;
   }
   return 'http://127.0.0.1:5000';
 }
 
 export const API_BASE = getApiBase();
 
+/**
+ * Absolute URL for an API path. Use for multipart (FormData) POSTs so they always reach Express
+ * on port 5000 in local dev, even if API_BASE were mis-resolved.
+ */
+export function apiUrl(path) {
+  const p = path.startsWith('/') ? path : `/${path}`;
+  const base = String(API_BASE || '').replace(/\/$/, '');
+  if (base && /^https?:\/\//i.test(base)) {
+    return `${base}${p}`;
+  }
+  if (typeof window !== 'undefined') {
+    const h = window.location.hostname;
+    if (h === 'localhost' || h === '127.0.0.1') {
+      return `http://127.0.0.1:5000${p}`;
+    }
+  }
+  return `http://127.0.0.1:5000${p}`;
+}
+
 /** User-facing hint when fetch fails (connection refused, DNS, etc.) */
 export function apiUnreachableMessage() {
   if (API_BASE) {
     return `Cannot reach the API at ${API_BASE}. Start the backend or fix REACT_APP_API_BASE_URL.`;
   }
-  return 'Cannot reach the API. Start the backend on port 5000 (CRA dev proxy forwards requests to it).';
+  return 'Cannot reach the API at http://127.0.0.1:5000. Start the backend (node server.js in /backend).';
 }
 
-/** Shown when API_BASE is relative (dev) but we need to mention where the server should be */
+/** Shown when API_BASE is empty in .env but we need to mention where the server should be */
 export function apiBaseForErrors() {
-  return API_BASE || 'http://127.0.0.1:5000 (dev proxy)';
+  return API_BASE || 'http://127.0.0.1:5000';
 }
 
 /**

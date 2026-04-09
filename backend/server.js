@@ -1,12 +1,39 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
 const { Pool } = require("pg");
 const bcrypt = require("bcrypt");
+const crypto = require("crypto");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const incidentUploadDir = path.join(__dirname, "uploads", "incidents");
+if (!fs.existsSync(incidentUploadDir)) {
+  fs.mkdirSync(incidentUploadDir, { recursive: true });
+}
+app.use("/uploads/incidents", express.static(incidentUploadDir));
+
+const incidentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, incidentUploadDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || "") || ".jpg";
+    cb(null, `${Date.now()}-${crypto.randomBytes(8).toString("hex")}${ext}`);
+  },
+});
+
+const uploadIncidentPhoto = multer({
+  storage: incidentStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const ok = /^image\/(jpeg|png|gif|webp)$/i.test(file.mimetype);
+    cb(ok ? null : new Error("Only JPEG, PNG, GIF, or WebP images are allowed."), ok);
+  },
+});
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -31,6 +58,22 @@ const EARLY_CHECKIN_MINUTES = Number(process.env.EARLY_CHECKIN_MINUTES) || 60;
  * Set ARRIVAL_WINDOW_MINUTES in backend/.env to override (default 20).
  */
 const ARRIVAL_WINDOW_MINUTES = Number(process.env.ARRIVAL_WINDOW_MINUTES) || 20;
+
+/** Parse user id from API (PostgreSQL uuid text). */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function parseUserId(raw) {
+  if (raw === undefined || raw === null) return null;
+  const s = String(raw).trim().replace(/^\{|\}$/g, "");
+  if (s === "") return null;
+  return UUID_RE.test(s) ? s : null;
+}
+
+/** Booking id — must match reservations.id (UUID in current schema). */
+function parseReservationId(raw) {
+  const s = String(raw ?? "").trim().replace(/^\{|\}$/g, "");
+  if (!s) return null;
+  return UUID_RE.test(s) ? s : null;
+}
 
 /** Mark missed check-ins as cancelled and free slots (call inside a transaction). */
 async function sweepNoShows(client) {
@@ -99,6 +142,209 @@ app.get("/health", async (req, res) => {
   }
 });
 
+async function ensureIncidentReportsTable() {
+  try {
+    const r = await pool.query(`
+      SELECT column_name, data_type
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'incident_reports'
+        AND column_name IN ('user_id', 'reservation_id')
+    `);
+    const types = Object.fromEntries(r.rows.map((row) => [row.column_name, row.data_type]));
+    const badUser = types.user_id === 'integer';
+    const badRes = types.reservation_id === 'integer';
+    if (badUser || badRes) {
+      await pool.query(`DROP TABLE IF EXISTS incident_reports CASCADE`);
+    }
+  } catch (e) {
+    console.warn("[ParkGo] incident_reports migration check:", e?.message || e);
+  }
+
+  /* Table is often created by superuser migration; ALTERs require owner — never throw to callers. */
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS incident_reports (
+        id SERIAL PRIMARY KEY,
+        user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        gatekeeper_id UUID REFERENCES users(id) ON DELETE SET NULL,
+        reservation_id UUID REFERENCES reservations(id),
+        full_name VARCHAR(255) NOT NULL,
+        mobile VARCHAR(50),
+        email VARCHAR(255),
+        description TEXT NOT NULL,
+        photo_filename VARCHAR(500),
+        reporter_type VARCHAR(20) DEFAULT 'user',
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+      );
+    `);
+    await pool.query(`
+      ALTER TABLE incident_reports ADD COLUMN IF NOT EXISTS reservation_id UUID REFERENCES reservations(id);
+    `);
+    await pool.query(`
+      ALTER TABLE incident_reports ADD COLUMN IF NOT EXISTS gatekeeper_id UUID REFERENCES users(id) ON DELETE SET NULL;
+    `);
+    await pool.query(`ALTER TABLE incident_reports ADD COLUMN IF NOT EXISTS email VARCHAR(255);`);
+    await pool.query(`ALTER TABLE incident_reports ADD COLUMN IF NOT EXISTS reporter_type VARCHAR(20) DEFAULT 'user';`);
+    try {
+      await pool.query(`ALTER TABLE incident_reports ALTER COLUMN mobile DROP NOT NULL;`);
+    } catch {
+      /* already nullable */
+    }
+    try {
+      await pool.query(`ALTER TABLE incident_reports ALTER COLUMN reservation_id DROP NOT NULL;`);
+    } catch {
+      /* already nullable or missing */
+    }
+  } catch (e) {
+    console.warn("[ParkGo] incident_reports ensure (non-fatal):", e?.message || e);
+  }
+}
+
+/**
+ * User-submitted incident reports (multipart: fullName, mobile, reservationId, description, optional photo, optional userId).
+ */
+app.post("/incidents", (req, res, next) => {
+  uploadIncidentPhoto.single("photo")(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ ok: false, error: "Photo must be 5 MB or smaller." });
+    }
+    return res.status(400).json({ ok: false, error: err.message || "Invalid file upload." });
+  });
+}, async (req, res) => {
+  try {
+    await ensureIncidentReportsTable();
+
+    const fullName = String(req.body.fullName || "").trim();
+    const mobile = String(req.body.mobile || "").trim();
+    const description = String(req.body.description || "").trim();
+    const rawReservationId = String(req.body.reservationId || "").trim();
+    const rawUserId = req.body.userId;
+    const userId = parseUserId(rawUserId);
+
+    if (!fullName || !mobile || !description) {
+      return res.status(400).json({
+        ok: false,
+        error: "Full name, mobile number, and description are required.",
+      });
+    }
+
+    if (!rawReservationId) {
+      return res.status(400).json({ ok: false, error: "Reservation ID is required." });
+    }
+
+    const reservationId = parseReservationId(rawReservationId);
+    if (reservationId === null) {
+      return res.status(400).json({
+        ok: false,
+        error: "Reservation ID must be your booking UUID (same as on your dashboard or QR).",
+      });
+    }
+
+    if (userId === null) {
+      return res.status(400).json({
+        ok: false,
+        error: "Please log in again, then submit your report.",
+      });
+    }
+
+    const uCheck = await pool.query("SELECT id FROM users WHERE id = $1", [userId]);
+    if (uCheck.rowCount === 0) {
+      return res.status(400).json({
+        ok: false,
+        error: "Your session is out of date. Please log out and log in again, then try submitting.",
+      });
+    }
+
+    const resCheck = await pool.query("SELECT id, user_id FROM reservations WHERE id = $1", [reservationId]);
+    if (resCheck.rowCount === 0) {
+      return res.status(400).json({
+        ok: false,
+        error: "Reservation not found. Check your booking ID on the dashboard or QR.",
+      });
+    }
+    const bookingOwnerId = resCheck.rows[0].user_id;
+    if (userId !== null && String(bookingOwnerId) !== String(userId)) {
+      return res.status(403).json({
+        ok: false,
+        error: "This reservation does not belong to your account. Use the booking ID from your own reservation list.",
+      });
+    }
+
+    const photoFilename = req.file ? req.file.filename : null;
+
+    await pool.query(
+      `INSERT INTO incident_reports (user_id, gatekeeper_id, reservation_id, full_name, mobile, email, description, photo_filename, reporter_type)
+       VALUES ($1, NULL, $2, $3, $4, NULL, $5, $6, 'user')`,
+      [userId, reservationId, fullName, mobile, description, photoFilename]
+    );
+
+    res.json({ ok: true, message: "Incident report submitted." });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: apiError(err) });
+  }
+});
+
+/**
+ * Gatekeeper-submitted incident reports (multipart: fullName, email, description, optional photo, gatekeeperUserId).
+ */
+app.post("/incidents/gatekeeper", (req, res, next) => {
+  uploadIncidentPhoto.single("photo")(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({ ok: false, error: "Photo must be 5 MB or smaller." });
+    }
+    return res.status(400).json({ ok: false, error: err.message || "Invalid file upload." });
+  });
+}, async (req, res) => {
+  try {
+    await ensureIncidentReportsTable();
+
+    const fullName = String(req.body.fullName || "").trim();
+    const email = String(req.body.email || "").trim();
+    const description = String(req.body.description || "").trim();
+    const gatekeeperId = parseUserId(req.body.gatekeeperUserId);
+
+    if (!fullName || !email || !description) {
+      return res.status(400).json({
+        ok: false,
+        error: "Full name, email, and description are required.",
+      });
+    }
+
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!emailOk) {
+      return res.status(400).json({ ok: false, error: "Please enter a valid email address." });
+    }
+
+    if (gatekeeperId === null) {
+      return res.status(400).json({ ok: false, error: "Gatekeeper session is required." });
+    }
+
+    const gk = await pool.query("SELECT id, role FROM users WHERE id = $1", [gatekeeperId]);
+    if (gk.rowCount === 0) {
+      return res.status(403).json({ ok: false, error: "Only gatekeeper accounts can submit this form." });
+    }
+    const role = String(gk.rows[0].role || "").toLowerCase();
+    if (role !== "gatekeeper") {
+      return res.status(403).json({ ok: false, error: "Only gatekeeper accounts can submit this form." });
+    }
+
+    const photoFilename = req.file ? req.file.filename : null;
+
+    await pool.query(
+      `INSERT INTO incident_reports (user_id, gatekeeper_id, reservation_id, full_name, mobile, email, description, photo_filename, reporter_type)
+       VALUES (NULL, $1, NULL, $2, NULL, $3, $4, $5, 'gatekeeper')`,
+      [gatekeeperId, fullName, email, description, photoFilename]
+    );
+
+    res.json({ ok: true, message: "Incident report submitted." });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: apiError(err) });
+  }
+});
+
 /* -------------------- AUTH -------------------- */
 app.post("/auth/signup", async (req, res) => {
   try {
@@ -157,7 +403,7 @@ app.post("/auth/login", async (req, res) => {
     }
 
     const r = await pool.query(
-      "SELECT id, first_name, last_name, username, email, role, password_hash FROM users WHERE email=$1 OR username=$1",
+      "SELECT id, first_name, last_name, username, email, phone_number, role, password_hash FROM users WHERE email=$1 OR username=$1",
       [identifier]
     );
 
@@ -289,11 +535,12 @@ app.post("/reservations", async (req, res) => {
     }
 
     const reservedSlotNo = slotRes.rows[0].slot_no;
+    const qrToken = crypto.randomUUID();
 
     const ins = await client.query(
       `INSERT INTO reservations
         (user_id, slot_no, start_time, end_time, status, payment_method, total_amount, qr_token)
-       VALUES ($1, $2, $3, $4, 'confirmed', $5, $6, NULL)
+       VALUES ($1, $2, $3, $4, 'confirmed', $5, $6, $7)
        RETURNING *`,
       [
         userId,
@@ -302,6 +549,7 @@ app.post("/reservations", async (req, res) => {
         endTime,
         paymentMethod || null,
         totalAmount || 0,
+        qrToken,
       ]
     );
 
@@ -502,6 +750,39 @@ app.get("/admin/reservations", async (req, res) => {
        ORDER BY r.created_at DESC`
     );
     res.json({ ok: true, reservations: r.rows });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: apiError(err) });
+  }
+});
+
+/* -------------------- ADMIN: all incident reports (users + gatekeepers) -------------------- */
+app.get("/admin/incidents", async (req, res) => {
+  try {
+    await ensureIncidentReportsTable();
+    const r = await pool.query(
+      `SELECT ir.id,
+              ir.created_at,
+              COALESCE(ir.reporter_type, 'user') AS reporter_type,
+              ir.full_name,
+              ir.mobile,
+              ir.email,
+              ir.description,
+              ir.photo_filename,
+              ir.reservation_id,
+              ir.user_id,
+              ir.gatekeeper_id,
+              u.first_name AS reporter_account_first_name,
+              u.last_name AS reporter_account_last_name,
+              u.email AS reporter_account_email,
+              gk.first_name AS gatekeeper_first_name,
+              gk.last_name AS gatekeeper_last_name,
+              gk.email AS gatekeeper_account_email
+       FROM incident_reports ir
+       LEFT JOIN users u ON ir.user_id = u.id
+       LEFT JOIN users gk ON ir.gatekeeper_id = gk.id
+       ORDER BY ir.created_at DESC`
+    );
+    res.json({ ok: true, incidents: r.rows });
   } catch (err) {
     res.status(500).json({ ok: false, error: apiError(err) });
   }
@@ -1030,12 +1311,45 @@ async function ensureAdmin() {
   }
 }
 
+/** Optional default gatekeeper (scan QR at /gatekeeper). Same pattern as ensureAdmin. */
+async function ensureGatekeeper() {
+  const gkEmail = process.env.GATEKEEPER_EMAIL;
+  const gkUsername = process.env.GATEKEEPER_USERNAME || "gatekeeper";
+  const gkPassword = process.env.GATEKEEPER_PASSWORD;
+
+  if (!gkEmail || !gkPassword) {
+    console.warn("GATEKEEPER_EMAIL and GATEKEEPER_PASSWORD not set — no default gatekeeper user will be created.");
+    return;
+  }
+
+  try {
+    const existing = await pool.query("SELECT id FROM users WHERE email = $1", [gkEmail]);
+    if (existing.rowCount > 0) return;
+
+    const passwordHash = await bcrypt.hash(gkPassword, 10);
+    await pool.query(
+      `INSERT INTO users (first_name, last_name, username, email, password_hash, role)
+       VALUES ($1, $2, $3, $4, $5, 'gatekeeper')`,
+      ["Gate", "Keeper", gkUsername, gkEmail, passwordHash]
+    );
+    console.log("Gatekeeper user created in database.");
+  } catch (err) {
+    console.error("Failed to ensure gatekeeper user:", err.message);
+  }
+}
+
 const PORT = process.env.PORT || 5000;
 /** How often to cancel confirmed bookings that missed the check-in window (frees slots without waiting for HTTP traffic). */
 const MISSED_CHECKIN_SWEEP_MS = Number(process.env.MISSED_CHECKIN_SWEEP_MS) || 60_000;
 
 app.listen(PORT, async () => {
+  try {
+    await ensureIncidentReportsTable();
+  } catch (e) {
+    console.error("[ParkGo] incident_reports table:", e?.message || e);
+  }
   await ensureAdmin();
+  await ensureGatekeeper();
   await runSweepNoShows();
   setInterval(() => {
     runSweepNoShows();

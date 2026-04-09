@@ -10,6 +10,14 @@ The admin account is stored in the database and can only log in with email and p
 - `ADMIN_PASSWORD` – admin login password
 - `ADMIN_USERNAME` – (optional) defaults to `"admin"`
 
+## Gatekeeper user (optional)
+
+For staff who scan QR codes at entry/exit (`/gatekeeper` in the app). You can create accounts in **Admin → Accounts** (role Gatekeeper), or set these in `backend/.env` so the server creates one user on startup if that email is not already registered:
+
+- `GATEKEEPER_EMAIL` – gatekeeper login email
+- `GATEKEEPER_PASSWORD` – gatekeeper login password
+- `GATEKEEPER_USERNAME` – (optional) defaults to `"gatekeeper"`
+
 From the project root:
 
 ```bash

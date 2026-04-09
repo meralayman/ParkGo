@@ -13,7 +13,9 @@ import PaymentPage from './pages/PaymentPage';
 import PaymentReturnPage from './pages/PaymentReturnPage';
 import AdminDashboard from './pages/AdminDashboard';
 import UserDashboard from './pages/UserDashboard';
+import ReportIncidentPage from './pages/ReportIncidentPage';
 import GatekeeperDashboard from './pages/GatekeeperDashboard';
+import ReportIncidentGatekeeperPage from './pages/ReportIncidentGatekeeperPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
@@ -41,10 +43,26 @@ function AppRoutes() {
           }
         />
         <Route
+          path="/user/report-incident"
+          element={
+            <ProtectedRoute role="user">
+              <ReportIncidentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/user/*"
           element={
             <ProtectedRoute role="user">
               <UserDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/gatekeeper/report-incident"
+          element={
+            <ProtectedRoute role="gatekeeper">
+              <ReportIncidentGatekeeperPage />
             </ProtectedRoute>
           }
         />

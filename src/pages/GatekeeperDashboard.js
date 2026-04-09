@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import "./Dashboard.css";
@@ -25,6 +26,7 @@ function safeStopHtml5Qrcode(scanner) {
 }
 
 const GatekeeperDashboard = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
 
   const [token, setToken] = useState("");
@@ -313,6 +315,13 @@ const GatekeeperDashboard = () => {
                 Stop camera
               </button>
             )}
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => navigate("/gatekeeper/report-incident")}
+            >
+              Report Incident
+            </button>
           </div>
 
           {cameraError && (

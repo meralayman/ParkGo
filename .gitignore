@@ -25,6 +25,12 @@ ai-planner/.venv/
 ai-planner/__pycache__/
 ai-planner/**/__pycache__/
 
+# Uploaded incident photos (local dev)
+backend/uploads/
+node_modules/
+.env
+__pycache__/
+*.log
 # IDE
 .vscode/
 .idea/

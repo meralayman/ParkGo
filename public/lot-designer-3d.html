@@ -1,0 +1,2463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>ParkGo · Lot designer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    /* Align with ParkGo (src/index.css) */
+    :root {
+      --logo-blue: #2563eb;
+      --logo-blue-dark: #1e40af;
+      --bg-dark: #0f172a;
+      --bg-card: #1e293b;
+      --bg-elevated: #334155;
+      --text-primary: #f1f5f9;
+      --text-muted: #94a3b8;
+      --border-subtle: rgba(148, 163, 184, 0.15);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page { padding: 16px; max-width: 1600px; margin: 0 auto; }
+
+    .title {
+      text-align: center;
+      font-size: clamp(1.25rem, 2.5vw, 1.5rem);
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: minmax(300px, 390px) 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .main { grid-template-columns: 1fr; }
+    }
+
+    .panel, .viewer-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .panel h3, .viewer-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .field { margin-bottom: 12px; }
+
+    .field label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 9px 11px;
+      font-size: 14px;
+      font-family: inherit;
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+    }
+
+    .field input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .field input[readonly] {
+      opacity: 0.95;
+      cursor: default;
+    }
+
+    .sub-section {
+      margin: 12px 0;
+      padding: 12px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.45);
+    }
+
+    .sub-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .btn, .small-btn {
+      border: none;
+      background: var(--logo-blue);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      font-family: inherit;
+      border-radius: 8px;
+      transition: background 0.15s ease;
+    }
+
+    .btn {
+      width: 100%;
+      padding: 11px;
+      margin-top: 8px;
+    }
+
+    .small-btn {
+      padding: 9px 12px;
+      font-size: 13px;
+    }
+
+    .btn:hover, .small-btn:hover {
+      background: var(--logo-blue-dark);
+    }
+
+    .view-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    #sceneWrap {
+      width: 100%;
+      height: 650px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #ffffff;
+    }
+
+    #scene-container {
+      width: 100%;
+      height: 100%;
+    }
+
+    .hint {
+      margin-top: 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .hidden { display: none; }
+
+    .notch-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .notch-card {
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 10px;
+      background: var(--bg-elevated);
+    }
+
+    .notch-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .mini-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .mini-grid .field {
+      margin-bottom: 0;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .checkbox-row label {
+      color: var(--text-muted);
+      font-weight: 500;
+      margin-bottom: 0;
+    }
+
+    .checkbox-row input {
+      width: auto;
+      accent-color: var(--logo-blue);
+    }
+
+    .notch-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .notch-counter {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+
+    .notch-actions {
+      display: flex;
+      gap: 8px;
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="page">
+    <div class="title">Smart parking layout</div>
+
+    <div class="main">
+      <div class="panel">
+        <h3>Parameters</h3>
+
+        <div class="sub-section">
+          <div class="sub-title">Terrain</div>
+
+          <div class="field">
+            <label for="terrainType">Terrain Type</label>
+            <select id="terrainType">
+              <option value="regular">Regular Terrain</option>
+              <option value="customNotches">Custom Notched Terrain</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="layoutType">Parking Layout</label>
+            <select id="layoutType">
+              <option value="rectangle">Rectangle Layout</option>
+              <option value="centeredRectangle">Centered Rectangle Layout</option>
+              <option value="lshape">L Layout</option>
+              <option value="ushape">U Layout</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="width">Width (m)</label>
+            <input id="width" type="number" value="36" />
+          </div>
+
+          <div class="field">
+            <label for="height">Height (m)</label>
+            <input id="height" type="number" value="20" />
+          </div>
+        </div>
+
+        <div id="customNotchesSection" class="sub-section hidden">
+          <div class="sub-title">Custom Notches</div>
+
+          <div class="notch-toolbar">
+            <div class="notch-counter">Number of Notches: <span id="notchCountLabel">0</span></div>
+            <div class="notch-actions">
+              <button type="button" class="small-btn" id="removeNotchBtn">- Remove Notch</button>
+              <button type="button" class="small-btn" id="addNotchBtn">+ Add Notch</button>
+            </div>
+          </div>
+
+          <div id="notchGrid" class="notch-grid"></div>
+        </div>
+
+        <div class="sub-section">
+          <div class="sub-title">Parking Controls</div>
+
+          <div class="field">
+            <label for="slotsPerRow">Slots per Row</label>
+            <input id="slotsPerRow" type="number" value="8" min="4" max="16" />
+          </div>
+
+          <div class="field">
+            <label for="parkingAngle">Parking Angle</label>
+            <select id="parkingAngle">
+              <option value="90">90°</option>
+              <option value="60">60°</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="gateMode">Gate Type</label>
+            <select id="gateMode">
+              <option value="same">Same Entry and Exit Gate</option>
+              <option value="separate">Separate Entry and Exit Gates</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="entrySide">Entry Gate Side</label>
+            <select id="entrySide">
+              <option value="bottom">Bottom</option>
+              <option value="top">Top</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="exitSide">Exit Gate Side</label>
+            <select id="exitSide">
+              <option value="bottom">Bottom</option>
+              <option value="top">Top</option>
+              <option value="left">Left</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="sub-section">
+          <div class="sub-title">Landscape</div>
+
+          <div class="field">
+            <label for="trees">Trees</label>
+            <input id="trees" type="number" value="0" min="0" />
+          </div>
+
+          <div class="field">
+            <label for="islands">Center Islands</label>
+            <input id="islands" type="number" value="0" min="0" />
+          </div>
+
+          <div class="field">
+            <label for="rocks">Rocks</label>
+            <input id="rocks" type="number" value="0" min="0" />
+          </div>
+
+          <div class="field">
+            <label for="disabledArea">Disabled Area</label>
+            <select id="disabledArea">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="treePosition">Tree Position</label>
+            <select id="treePosition">
+              <option value="center">Center Islands</option>
+              <option value="top">Top Side</option>
+              <option value="bottom">Bottom Side</option>
+              <option value="left">Left Side</option>
+              <option value="right">Right Side</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="treeShiftX">Tree Shift X (cm)</label>
+            <input id="treeShiftX" type="number" value="0" />
+          </div>
+
+          <div class="field">
+            <label for="treeShiftZ">Tree Shift Z (cm)</label>
+            <input id="treeShiftZ" type="number" value="0" />
+          </div>
+
+          <div class="field">
+            <label for="obstaclePosition">Obstacle Position</label>
+            <select id="obstaclePosition">
+              <option value="topRight">Top Right</option>
+              <option value="topLeft">Top Left</option>
+              <option value="bottomRight">Bottom Right</option>
+              <option value="bottomLeft">Bottom Left</option>
+              <option value="center">Center</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="obstacleShiftX">Obstacle Shift X (cm)</label>
+            <input id="obstacleShiftX" type="number" value="0" />
+          </div>
+
+          <div class="field">
+            <label for="obstacleShiftZ">Obstacle Shift Z (cm)</label>
+            <input id="obstacleShiftZ" type="number" value="0" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="warningBox">Layout Warning</label>
+          <input id="warningBox" type="text" readonly value="No warning" />
+        </div>
+
+        <button class="btn" id="generateBtn">Generate Layout</button>
+
+        <div class="view-actions">
+          <button class="small-btn" id="resetViewBtn">Reset View</button>
+          <button class="small-btn" id="topViewBtn">Top View</button>
+        </div>
+
+        <div class="hint">
+          Left mouse = rotate<br>
+          Mouse wheel = zoom<br>
+          Right mouse = move view
+        </div>
+      </div>
+
+      <div class="viewer-card">
+        <div class="viewer-title">3D preview</div>
+        <div id="sceneWrap">
+          <div id="scene-container"></div>
+        </div>
+        <div class="hint">
+          Use custom notches on sides and corners — add or remove in the panel.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+
+    const container = document.getElementById("scene-container");
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xffffff);
+
+    const camera = new THREE.PerspectiveCamera(
+      45,
+      container.clientWidth / container.clientHeight,
+      0.1,
+      1000
+    );
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.02;
+    container.appendChild(renderer.domElement);
+
+    const sharedMaterials = new Set();
+    function registerMat(m) {
+      sharedMaterials.add(m);
+    }
+
+    const MAT = {
+      asphalt: new THREE.MeshStandardMaterial({
+        color: 0x3c4147,
+        roughness: 0.96,
+        metalness: 0.02,
+        envMapIntensity: 0.35
+      }),
+      stripeWhite: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.32,
+        metalness: 0.04
+      }),
+      stripeYellow: new THREE.MeshStandardMaterial({
+        color: 0xf5d030,
+        roughness: 0.42,
+        metalness: 0.08
+      }),
+      curb: new THREE.MeshStandardMaterial({
+        color: 0xf5f6f8,
+        roughness: 0.5,
+        metalness: 0.03
+      }),
+      concreteIsland: new THREE.MeshStandardMaterial({ color: 0xb9c0ca, roughness: 0.9, metalness: 0.05 }),
+      corrugated: new THREE.MeshStandardMaterial({ color: 0xe6e9ef, roughness: 0.82, metalness: 0.06 }),
+      cabinRoof: new THREE.MeshStandardMaterial({ color: 0xa8b0bc, roughness: 0.72, metalness: 0.18 }),
+      cabinGlass: new THREE.MeshStandardMaterial({
+        color: 0x1a2330,
+        roughness: 0.15,
+        metalness: 0.88,
+        transparent: true,
+        opacity: 0.72
+      }),
+      windowFrame: new THREE.MeshStandardMaterial({ color: 0x0f1216, roughness: 0.55, metalness: 0.35 }),
+      grassPatch: new THREE.MeshStandardMaterial({ color: 0x4a7a46, roughness: 0.95, metalness: 0 }),
+      boomRed: new THREE.MeshStandardMaterial({ color: 0xd62828, roughness: 0.42, metalness: 0.15 }),
+      boomWhite: new THREE.MeshStandardMaterial({ color: 0xf4f6f8, roughness: 0.38, metalness: 0.08 }),
+      pedestal: new THREE.MeshStandardMaterial({ color: 0xf0f2f6, roughness: 0.55, metalness: 0.06 }),
+      bollardYellow: new THREE.MeshStandardMaterial({ color: 0xf5e020, roughness: 0.48, metalness: 0.2 }),
+      cabinWall: new THREE.MeshStandardMaterial({ color: 0xe8eaee, roughness: 0.84, metalness: 0.04 }),
+      fencePost: new THREE.MeshStandardMaterial({ color: 0x353a42, metalness: 0.58, roughness: 0.32 }),
+      fenceRail: new THREE.MeshStandardMaterial({ color: 0x4a5568, metalness: 0.52, roughness: 0.36 }),
+      fenceWire: new THREE.MeshStandardMaterial({ color: 0x5c6474, metalness: 0.5, roughness: 0.38 })
+    };
+    registerMat(MAT.asphalt);
+    registerMat(MAT.stripeWhite);
+    registerMat(MAT.stripeYellow);
+    registerMat(MAT.curb);
+    registerMat(MAT.concreteIsland);
+    registerMat(MAT.corrugated);
+    registerMat(MAT.cabinRoof);
+    registerMat(MAT.cabinGlass);
+    registerMat(MAT.windowFrame);
+    registerMat(MAT.grassPatch);
+    registerMat(MAT.boomRed);
+    registerMat(MAT.boomWhite);
+    registerMat(MAT.pedestal);
+    registerMat(MAT.bollardYellow);
+    registerMat(MAT.cabinWall);
+    registerMat(MAT.fencePost);
+    registerMat(MAT.fenceRail);
+    registerMat(MAT.fenceWire);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.rotateSpeed = 0.75;
+    controls.zoomSpeed = 1.0;
+    controls.panSpeed = 0.7;
+    controls.minDistance = 12;
+    controls.maxDistance = 95;
+    controls.maxPolarAngle = Math.PI / 2.02;
+
+    function setDefaultView() {
+      camera.position.set(28, 22, 24);
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+
+    function setTopView() {
+      camera.position.set(0, 44, 0.01);
+      controls.target.set(0, 0, 0);
+      controls.update();
+    }
+
+    setDefaultView();
+
+    scene.add(new THREE.AmbientLight(0xffffff, 0.52));
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xe8e8ea, 0.38));
+
+    const sun = new THREE.DirectionalLight(0xffffff, 1.05);
+    sun.position.set(44, 52, 26);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 2;
+    sun.shadow.camera.far = 160;
+    sun.shadow.camera.left = -70;
+    sun.shadow.camera.right = 70;
+    sun.shadow.camera.top = 70;
+    sun.shadow.camera.bottom = -70;
+    sun.shadow.bias = -0.00025;
+    sun.shadow.normalBias = 0.02;
+    scene.add(sun);
+
+    let layoutGroup = new THREE.Group();
+    scene.add(layoutGroup);
+
+    const carColors = [
+      0xf5f5f5, 0xe5e7eb, 0x1e293b, 0x0f172a, 0xb91c1c, 0x1e3a5f,
+      0x2563eb, 0x0d9488, 0x64748b, 0xffffff
+    ];
+
+    function clearLayout() {
+      scene.remove(layoutGroup);
+      layoutGroup.traverse(obj => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          const disposeOne = (m) => {
+            if (m && !sharedMaterials.has(m)) m.dispose();
+          };
+          if (Array.isArray(obj.material)) obj.material.forEach(disposeOne);
+          else disposeOne(obj.material);
+        }
+      });
+      layoutGroup = new THREE.Group();
+      scene.add(layoutGroup);
+    }
+
+    function addMesh(geo, mat, x=0, y=0, z=0, rx=0, ry=0, rz=0) {
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(x, y, z);
+      m.rotation.set(rx, ry, rz);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      layoutGroup.add(m);
+      return m;
+    }
+
+    function addFencePipeAlong(xa, za, xb, zb, y, radius) {
+      const dir = new THREE.Vector3(xb - xa, 0, zb - za);
+      const L = dir.length();
+      if (L < 0.02) return;
+      dir.normalize();
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, L, 12), MAT.fenceRail);
+      m.position.set((xa + xb) / 2, y, (za + zb) / 2);
+      m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      layoutGroup.add(m);
+    }
+
+    /**
+     * Ornamental vertical-bar fence: square posts, tubular rails, round pickets with ball caps (not chain-link).
+     */
+    function makeFenceSegment(x1, z1, x2, z2) {
+      const dx = x2 - x1;
+      const dz = z2 - z1;
+      const len = Math.hypot(dx, dz);
+      if (len < 0.05) return;
+      const ux = dx / len;
+      const uz = dz / len;
+      const ry = Math.atan2(ux, uz);
+      const postH = 1.22;
+      const postW = 0.075;
+      const yPost = postH / 2 + 0.01;
+      const yRailLo = 0.24;
+      const yRailHi = 0.88;
+      const yPicketTop = 1.05;
+      const picketR = 0.012;
+      const maxSpan = 2.1;
+      const n = Math.max(1, Math.ceil(len / maxSpan));
+      const step = len / n;
+      const posts = [];
+      for (let i = 0; i <= n; i++) {
+        const s = Math.min(i * step, len);
+        const px = x1 + ux * s;
+        const pz = z1 + uz * s;
+        addMesh(new RoundedBoxGeometry(postW, postH, postW, 2, 0.012), MAT.fencePost, px, yPost, pz);
+        const capY = postH + 0.012;
+        addMesh(new RoundedBoxGeometry(postW * 1.08, 0.045, postW * 1.08, 2, 0.01), MAT.fenceRail, px, capY, pz);
+        posts.push({ px, pz });
+      }
+      const picketStep = 0.17;
+      for (let i = 0; i < posts.length - 1; i++) {
+        const a = posts[i];
+        const b = posts[i + 1];
+        const slen = Math.hypot(b.px - a.px, b.pz - a.pz);
+        addFencePipeAlong(a.px, a.pz, b.px, b.pz, yRailLo, 0.018);
+        addFencePipeAlong(a.px, a.pz, b.px, b.pz, yRailHi, 0.018);
+        const yPicketBase = 0.06;
+        let u = picketStep * 0.5;
+        while (u < slen - 0.04) {
+          const mx = a.px + ux * u;
+          const mz = a.pz + uz * u;
+          const barH = yPicketTop - yPicketBase;
+          addMesh(
+            new THREE.CylinderGeometry(picketR, picketR * 0.88, barH, 10),
+            MAT.fenceWire,
+            mx,
+            yPicketBase + barH / 2,
+            mz,
+            0,
+            ry,
+            0
+          );
+          addMesh(new THREE.SphereGeometry(0.017, 10, 8), MAT.fenceRail, mx, yPicketTop + 0.02, mz);
+          u += picketStep;
+        }
+      }
+    }
+
+    function createParkingStripe(x, z, w, h, rotY=0, color=0xffffff) {
+      let mat;
+      if (color === 0xffffff || color === 0xf5f5f5) mat = MAT.stripeWhite;
+      else if (color === 0xfacc15 || color === 0xf5d030) mat = MAT.stripeYellow;
+      else mat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.08 });
+      addMesh(
+        new THREE.BoxGeometry(w, 0.009, h),
+        mat,
+        x, 0.01, z, 0, rotY, 0
+      );
+    }
+
+    /** Dashed line parallel to Z at fixed x */
+    function dashStripeAlongZ(x, z0, z1, color = 0xfacc15, dashLen = 0.45, gapLen = 0.32) {
+      let z = z0;
+      while (z < z1 - 0.05) {
+        const end = Math.min(z + dashLen, z1);
+        createParkingStripe(x, (z + end) / 2, 0.11, end - z, 0, color);
+        z = end + gapLen;
+      }
+    }
+
+    /** Dashed line parallel to X at fixed z */
+    function dashStripeAlongX(x0, x1, z, color = 0xfacc15, dashLen = 0.45, gapLen = 0.32) {
+      let x = x0;
+      while (x < x1 - 0.05) {
+        const end = Math.min(x + dashLen, x1);
+        createParkingStripe((x + end) / 2, z, end - x, 0.11, 0, color);
+        x = end + gapLen;
+      }
+    }
+
+    function getGateApproachMetrics(bounds) {
+      const LANE_LEN = Math.min(7.5, Math.max(4.5, (bounds.maxX - bounds.minX) * 0.18));
+      const inset = 0.22;
+      return { LANE_LEN, inset };
+    }
+
+    /**
+     * White edge lines + yellow dashed center for entry/exit approach (aligned with gate opening).
+     */
+    function createApproachLaneOnSide(side, bounds) {
+      const { LANE_LEN, inset } = getGateApproachMetrics(bounds);
+      const LANE_HALF_W = 1.32;
+      const t = 0.09;
+
+      if (side === "top") {
+        const z0 = bounds.minZ + inset;
+        const z1 = z0 + LANE_LEN;
+        const zc = (z0 + z1) / 2;
+        createParkingStripe(-LANE_HALF_W, zc, t, z1 - z0, 0, 0xffffff);
+        createParkingStripe(LANE_HALF_W, zc, t, z1 - z0, 0, 0xffffff);
+        dashStripeAlongZ(0, z0, z1, 0xfacc15);
+      } else if (side === "bottom") {
+        const z1 = bounds.maxZ - inset;
+        const z0 = z1 - LANE_LEN;
+        const zc = (z0 + z1) / 2;
+        createParkingStripe(-LANE_HALF_W, zc, t, z1 - z0, 0, 0xffffff);
+        createParkingStripe(LANE_HALF_W, zc, t, z1 - z0, 0, 0xffffff);
+        dashStripeAlongZ(0, z0, z1, 0xfacc15);
+      } else if (side === "left") {
+        const x0 = bounds.minX + inset;
+        const x1 = x0 + LANE_LEN;
+        const xc = (x0 + x1) / 2;
+        createParkingStripe(xc, -LANE_HALF_W, x1 - x0, t, 0, 0xffffff);
+        createParkingStripe(xc, LANE_HALF_W, x1 - x0, t, 0, 0xffffff);
+        dashStripeAlongX(x0, x1, 0, 0xfacc15);
+      } else if (side === "right") {
+        const x1 = bounds.maxX - inset;
+        const x0 = x1 - LANE_LEN;
+        const xc = (x0 + x1) / 2;
+        createParkingStripe(xc, -LANE_HALF_W, x1 - x0, t, 0, 0xffffff);
+        createParkingStripe(xc, LANE_HALF_W, x1 - x0, t, 0, 0xffffff);
+        dashStripeAlongX(x0, x1, 0, 0xfacc15);
+      }
+    }
+
+    function addGateApproachLanes(params, bounds) {
+      const sides =
+        params.gateMode === "same" ? [params.entrySide] : [params.entrySide, params.exitSide];
+      const seen = new Set();
+      for (const s of sides) {
+        if (!s || seen.has(s)) continue;
+        seen.add(s);
+        createApproachLaneOnSide(s, bounds);
+      }
+    }
+
+    function createCar(x, z, ry=0, color=0xffffff) {
+      const g = new THREE.Group();
+
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.38,
+        metalness: 0.48
+      });
+
+      const glassMat = new THREE.MeshStandardMaterial({
+        color: 0xa9c4e7,
+        transparent: true,
+        opacity: 0.9
+      });
+
+      const darkMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+
+      const body = new THREE.Mesh(
+        new RoundedBoxGeometry(1.18, 0.28, 2.15, 3, 0.08),
+        bodyMat
+      );
+      body.position.y = 0.28;
+      g.add(body);
+
+      const cabin = new THREE.Mesh(
+        new RoundedBoxGeometry(0.82, 0.26, 1.02, 3, 0.06),
+        glassMat
+      );
+      cabin.position.y = 0.55;
+      g.add(cabin);
+
+      const wheelGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.12, 16);
+
+      function wheel(xw, zw) {
+        const w = new THREE.Mesh(wheelGeo, darkMat);
+        w.rotation.z = Math.PI / 2;
+        w.position.set(xw, 0.12, zw);
+        g.add(w);
+      }
+
+      wheel(-0.53, 0.66);
+      wheel( 0.53, 0.66);
+      wheel(-0.53,-0.66);
+      wheel( 0.53,-0.66);
+
+      g.position.set(x, 0, z);
+      g.rotation.y = ry;
+      g.traverse(o => {
+        if (o.isMesh) {
+          o.castShadow = true;
+          o.receiveShadow = true;
+        }
+      });
+      layoutGroup.add(g);
+    }
+
+    function createTree(x, z) {
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.11, 0.9, 12),
+        new THREE.MeshStandardMaterial({ color: 0x5c3d1e, roughness: 0.95 })
+      );
+      trunk.position.set(x, 0.45, z);
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
+
+      const leafA = new THREE.MeshStandardMaterial({ color: 0x2d6a45, roughness: 0.88, metalness: 0 });
+      const leafB = new THREE.MeshStandardMaterial({ color: 0x256b3f, roughness: 0.88, metalness: 0 });
+
+      const crown1 = new THREE.Mesh(
+        new THREE.SphereGeometry(0.32, 20, 18),
+        leafA
+      );
+      crown1.position.set(x, 0.98, z);
+      crown1.castShadow = true;
+      crown1.receiveShadow = true;
+
+      const crown2 = new THREE.Mesh(
+        new THREE.SphereGeometry(0.24, 18, 16),
+        leafB
+      );
+      crown2.position.set(x + 0.14, 1.12, z + 0.06);
+      crown2.castShadow = true;
+      crown2.receiveShadow = true;
+
+      layoutGroup.add(trunk, crown1, crown2);
+    }
+
+    function createRock(x, z, scale=1) {
+      const rock = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.32 * scale),
+        new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 1, metalness: 0.05 })
+      );
+      rock.position.set(x, 0.20 * scale, z);
+      rock.scale.set(1.4, 0.85, 1.0);
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      layoutGroup.add(rock);
+    }
+
+    function createIsland(x, z, w=2.3, h=1.05, withTree=true) {
+      addMesh(
+        new RoundedBoxGeometry(w, 0.16, h, 3, 0.05),
+        MAT.curb,
+        x, 0.08, z
+      );
+
+      addMesh(
+        new RoundedBoxGeometry(w - 0.12, 0.08, h - 0.12, 3, 0.05),
+        new THREE.MeshStandardMaterial({ color: 0x4a7c4e, roughness: 0.92, metalness: 0 }),
+        x, 0.15, z
+      );
+
+      if (withTree) createTree(x, z);
+    }
+
+    function createDisabledMark(x, z, rotY=0) {
+      createParkingStripe(x, z, 1.4, 2.2, rotY, 0x3b82f6);
+    }
+
+    function createRockZone(x, z, w=4.8, h=2.2, rocks=4) {
+      if (rocks <= 0) return;
+
+      addMesh(
+        new RoundedBoxGeometry(w, 0.16, h, 3, 0.05),
+        new THREE.MeshStandardMaterial({ color: 0xb08b62 }),
+        x, 0.08, z
+      );
+
+      addMesh(
+        new RoundedBoxGeometry(w - 0.14, 0.09, h - 0.14, 3, 0.05),
+        new THREE.MeshStandardMaterial({ color: 0x8a6a46 }),
+        x, 0.15, z
+      );
+
+      const cols = Math.max(1, Math.min(rocks, 3));
+      const rows = Math.ceil(rocks / cols);
+      let count = 0;
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          if (count >= rocks) break;
+          const rx = x - w/3 + c * 1.2;
+          const rz = z - h/4 + r * 0.9;
+          createRock(rx, rz, 1.15);
+          count++;
+        }
+      }
+    }
+
+    function createGateIslandPlatform(anchor, side) {
+      if (!anchor || !side) return null;
+      const W = 3.45;
+      const D = 2.12;
+      const H = 0.17;
+      let cx;
+      let cz;
+      if (side === "top") {
+        cx = anchor.x;
+        cz = anchor.z + D * 0.3;
+      } else if (side === "bottom") {
+        cx = anchor.x;
+        cz = anchor.z - D * 0.3;
+      } else if (side === "left") {
+        cx = anchor.x + D * 0.3;
+        cz = anchor.z;
+      } else {
+        cx = anchor.x - D * 0.3;
+        cz = anchor.z;
+      }
+      const yBase = H / 2 + 0.01;
+      addMesh(new RoundedBoxGeometry(W, H, D, 3, 0.06), MAT.concreteIsland, cx, yBase, cz);
+      const lip = 0.07;
+      const ly = H + 0.035;
+      if (side === "top" || side === "bottom") {
+        addMesh(new THREE.BoxGeometry(W + lip * 2, 0.055, lip), MAT.curb, cx, ly, cz + (side === "top" ? D / 2 : -D / 2));
+        addMesh(new THREE.BoxGeometry(W + lip * 2, 0.055, lip), MAT.curb, cx, ly, cz - (side === "top" ? D / 2 : -D / 2));
+        addMesh(new THREE.BoxGeometry(lip, 0.055, D + lip * 2), MAT.curb, cx - W / 2, ly, cz);
+        addMesh(new THREE.BoxGeometry(lip, 0.055, D + lip * 2), MAT.curb, cx + W / 2, ly, cz);
+      } else {
+        addMesh(new THREE.BoxGeometry(lip, 0.055, D + lip * 2), MAT.curb, cx + (side === "left" ? D / 2 : -D / 2), ly, cz);
+        addMesh(new THREE.BoxGeometry(lip, 0.055, D + lip * 2), MAT.curb, cx - (side === "left" ? D / 2 : -D / 2), ly, cz);
+        addMesh(new THREE.BoxGeometry(W + lip * 2, 0.055, lip), MAT.curb, cx, ly, cz + D / 2);
+        addMesh(new THREE.BoxGeometry(W + lip * 2, 0.055, lip), MAT.curb, cx, ly, cz - D / 2);
+      }
+      const gW = Math.min(1.15, W * 0.38);
+      const gD = 0.42;
+      let gx = cx;
+      let gz = cz;
+      if (side === "top") gz = cz - D / 2 + gD / 2 + 0.04;
+      else if (side === "bottom") gz = cz + D / 2 - gD / 2 - 0.04;
+      else if (side === "left") gx = cx - D / 2 + gD / 2 + 0.04;
+      else gx = cx + D / 2 - gD / 2 - 0.04;
+      addMesh(new RoundedBoxGeometry(gW, 0.06, gD, 2, 0.03), MAT.grassPatch, gx, H + 0.04, gz);
+      return { cx, cz, topY: H + 0.06, pW: W, pD: D };
+    }
+
+    function createSafetyBollardU(px, py, pz, rotY) {
+      const t = 0.038;
+      const postH = 0.36;
+      const spread = 0.22;
+      addMesh(new THREE.CylinderGeometry(0.045, 0.05, postH, 10), MAT.bollardYellow, px - spread, py + postH / 2, pz, 0, rotY, 0);
+      addMesh(new THREE.CylinderGeometry(0.045, 0.05, postH, 10), MAT.bollardYellow, px + spread, py + postH / 2, pz, 0, rotY, 0);
+      addMesh(new THREE.BoxGeometry(spread * 2 + t, t, t), MAT.bollardYellow, px, py + postH, pz, 0, rotY, 0);
+      addMesh(new THREE.CylinderGeometry(0.06, 0.06, 0.12, 10), MAT.boomRed, px, py + 0.08, pz, 0, rotY, 0);
+    }
+
+    /** span = extent along X (slats) or Z (slats); faceCoord = fixed Z (alongX) or fixed X (!alongX). */
+    function addCorrugatedSlats(centerX, centerZ, span, height, yMid, faceCoord, alongX) {
+      const n = 15;
+      const pitch = span / n;
+      for (let i = 0; i < n; i++) {
+        const u = (i + 0.5 - n / 2) * pitch;
+        if (alongX) {
+          addMesh(new THREE.BoxGeometry(0.022, height * 0.92, 0.04), MAT.corrugated, centerX + u, yMid, faceCoord, 0, 0, 0);
+        } else {
+          addMesh(new THREE.BoxGeometry(0.04, height * 0.92, 0.022), MAT.corrugated, faceCoord, yMid, centerZ + u, 0, 0, 0);
+        }
+      }
+    }
+
+    function addWindowZFace(px, py, pz, wSpan, hSpan) {
+      const f = 0.028;
+      addMesh(new THREE.BoxGeometry(wSpan + f * 2, hSpan + f * 2, 0.045), MAT.windowFrame, px, py, pz, 0, 0, 0);
+      addMesh(new THREE.BoxGeometry(wSpan, hSpan, 0.032), MAT.cabinGlass, px, py, pz, 0, 0, 0);
+    }
+
+    function addWindowXFace(px, py, pz, zSpan, hSpan) {
+      const f = 0.028;
+      addMesh(new THREE.BoxGeometry(0.05, hSpan + f * 2, zSpan + f * 2), MAT.windowFrame, px, py, pz, 0, 0, 0);
+      addMesh(new THREE.BoxGeometry(0.04, hSpan, zSpan), MAT.cabinGlass, px, py, pz, 0, 0, 0);
+    }
+
+    /**
+     * Guard cabin on raised island: corrugated siding, overhanging roof, framed dark glass (reference style).
+     */
+    function createSecurityCabin(anchor, side, accentColor, plat) {
+      if (!anchor || !side || !plat) return;
+      const { cx, cz, topY, pW, pD } = plat;
+      const W = 1.46;
+      const D = 1.05;
+      const H = 1.34;
+      const bodyY = topY + H / 2;
+      const over = 0.12;
+      const roofY = topY + H + 0.06;
+      const trimMat = new THREE.MeshStandardMaterial({ color: accentColor, roughness: 0.7 });
+      const yMid = topY + H * 0.48;
+      const wy = topY + H * 0.58;
+
+      if (side === "top") {
+        const bx = cx - 0.44;
+        const bz = cz + 0.14;
+        addMesh(new RoundedBoxGeometry(W, H, D, 3, 0.05), MAT.cabinWall, bx, bodyY, bz, 0, 0, 0);
+        addMesh(new RoundedBoxGeometry(W + over * 2, 0.11, D + over * 2, 3, 0.04), MAT.cabinRoof, bx, roofY, bz, 0, 0, 0);
+        addCorrugatedSlats(bx, bz, W * 0.88, H, yMid, bz - D / 2 + 0.03, true);
+        addCorrugatedSlats(bx, bz, D * 0.85, H, yMid, bx - W / 2 + 0.03, false);
+        addWindowZFace(bx, wy, bz - D / 2 - 0.02, W * 0.58, H * 0.42);
+        addWindowXFace(bx - W / 2 - 0.02, wy, bz, D * 0.55, H * 0.4);
+        addMesh(new THREE.BoxGeometry(W * 0.92, 0.06, 0.06), trimMat, bx, topY + H - 0.1, bz - D / 2 + 0.04, 0, 0, 0);
+        createSafetyBollardU(cx + pW * 0.28, topY + 0.02, cz - pD * 0.38, 0);
+      } else if (side === "bottom") {
+        const bx = cx - 0.44;
+        const bz = cz - 0.14;
+        addMesh(new RoundedBoxGeometry(W, H, D, 3, 0.05), MAT.cabinWall, bx, bodyY, bz, 0, 0, 0);
+        addMesh(new RoundedBoxGeometry(W + over * 2, 0.11, D + over * 2, 3, 0.04), MAT.cabinRoof, bx, roofY, bz, 0, 0, 0);
+        addCorrugatedSlats(bx, bz, W * 0.88, H, yMid, bz + D / 2 - 0.03, true);
+        addCorrugatedSlats(bx, bz, D * 0.85, H, yMid, bx - W / 2 + 0.03, false);
+        addWindowZFace(bx, wy, bz + D / 2 + 0.02, W * 0.58, H * 0.42);
+        addWindowXFace(bx - W / 2 - 0.02, wy, bz, D * 0.55, H * 0.4);
+        addMesh(new THREE.BoxGeometry(W * 0.92, 0.06, 0.06), trimMat, bx, topY + H - 0.1, bz + D / 2 - 0.04, 0, 0, 0);
+        createSafetyBollardU(cx + pW * 0.28, topY + 0.02, cz + pD * 0.38, Math.PI);
+      } else if (side === "left") {
+        const bx = cx + 0.14;
+        const bz = cz;
+        addMesh(new RoundedBoxGeometry(D, H, W, 3, 0.05), MAT.cabinWall, bx, bodyY, bz, 0, 0, 0);
+        addMesh(new RoundedBoxGeometry(D + over * 2, 0.11, W + over * 2, 3, 0.04), MAT.cabinRoof, bx, roofY, bz, 0, 0, 0);
+        addCorrugatedSlats(bx, bz, W * 0.88, H, yMid, bx - D / 2 + 0.03, false);
+        addCorrugatedSlats(bx, bz, D * 0.85, H, yMid, bz - W / 2 + 0.03, true);
+        addWindowXFace(bx - D / 2 - 0.02, wy, bz, W * 0.58, H * 0.42);
+        addWindowZFace(bx, wy, bz - W / 2 - 0.02, D * 0.55, H * 0.4);
+        addMesh(new THREE.BoxGeometry(0.06, 0.06, W * 0.92), trimMat, bx - D / 2 + 0.04, topY + H - 0.1, bz, 0, 0, 0);
+        createSafetyBollardU(cx - pD * 0.38, topY + 0.02, cz + pW * 0.28, Math.PI / 2);
+      } else {
+        const bx = cx - 0.14;
+        const bz = cz;
+        addMesh(new RoundedBoxGeometry(D, H, W, 3, 0.05), MAT.cabinWall, bx, bodyY, bz, 0, 0, 0);
+        addMesh(new RoundedBoxGeometry(D + over * 2, 0.11, W + over * 2, 3, 0.04), MAT.cabinRoof, bx, roofY, bz, 0, 0, 0);
+        addCorrugatedSlats(bx, bz, W * 0.88, H, yMid, bx + D / 2 - 0.03, false);
+        addCorrugatedSlats(bx, bz, D * 0.85, H, yMid, bz - W / 2 + 0.03, true);
+        addWindowXFace(bx + D / 2 + 0.02, wy, bz, W * 0.58, H * 0.42);
+        addWindowZFace(bx, wy, bz - W / 2 - 0.02, D * 0.55, H * 0.4);
+        addMesh(new THREE.BoxGeometry(0.06, 0.06, W * 0.92), trimMat, bx + D / 2 - 0.04, topY + H - 0.1, bz, 0, 0, 0);
+        createSafetyBollardU(cx + pD * 0.38, topY + 0.02, cz + pW * 0.28, -Math.PI / 2);
+      }
+    }
+
+    function createBoomGateAtAnchor(anchor, side, color, plat) {
+      if (!anchor || !plat) return;
+      const { cx, cz, topY, pW, pD } = plat;
+      const wx = Math.cos(anchor.ry);
+      const wz = -Math.sin(anchor.ry);
+      let pedX;
+      let pedZ;
+      if (side === "top") {
+        pedX = cx + 0.85;
+        pedZ = cz - pD * 0.25;
+      } else if (side === "bottom") {
+        pedX = cx + 0.85;
+        pedZ = cz + pD * 0.25;
+      } else if (side === "left") {
+        pedX = cx - pD * 0.25;
+        pedZ = cz + 0.85;
+      } else {
+        pedX = cx + pD * 0.25;
+        pedZ = cz + 0.85;
+      }
+      const pedH = 0.62;
+      const pedY = topY + pedH / 2 + 0.02;
+      addMesh(new RoundedBoxGeometry(0.38, pedH, 0.38, 2, 0.04), MAT.pedestal, pedX, pedY, pedZ);
+      const boomY = topY + pedH + 0.08;
+      const totalLen = 3.18;
+      const nSeg = 18;
+      const segLen = totalLen / nSeg;
+      const half = totalLen / 2;
+      const baseX = pedX + wx * 0.22;
+      const baseZ = pedZ + wz * 0.22;
+      const boomDir = new THREE.Vector3(wx, 0, wz).normalize();
+      for (let i = 0; i < nSeg; i++) {
+        const t = -half + (i + 0.5) * segLen;
+        const mx = baseX + wx * t;
+        const mz = baseZ + wz * t;
+        const mat = i % 2 === 0 ? MAT.boomWhite : MAT.boomRed;
+        const geo = new THREE.CylinderGeometry(0.046, 0.046, segLen - 0.004, 12);
+        const m = new THREE.Mesh(geo, mat);
+        m.position.set(mx, boomY, mz);
+        m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), boomDir);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        layoutGroup.add(m);
+      }
+    }
+
+    function createGatekeeperStation(anchor, side, color = 0x2563eb) {
+      if (!anchor || !side) return;
+      const plat = createGateIslandPlatform(anchor, side);
+      if (!plat) return;
+      createSecurityCabin(anchor, side, color, plat);
+      createBoomGateAtAnchor(anchor, side, color, plat);
+    }
+
+    function createLamp(x, z) {
+      const poleMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.45, metalness: 0.55 });
+      const headMat = new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        roughness: 0.22,
+        metalness: 0.12,
+        emissive: 0xfefce8,
+        emissiveIntensity: 0.08
+      });
+      addMesh(new THREE.CylinderGeometry(0.022, 0.028, 4.85, 10), poleMat, x, 2.42, z);
+      addMesh(new THREE.CylinderGeometry(0.26, 0.26, 0.045, 28), headMat, x, 4.88, z);
+    }
+
+    function createArrow(x, z, rotY=0) {
+      const group = new THREE.Group();
+
+      const shaft = new THREE.Mesh(
+        new THREE.BoxGeometry(1.0, 0.01, 0.12),
+        new THREE.MeshStandardMaterial({ color: 0xffffff })
+      );
+      shaft.position.z = 0.2;
+      group.add(shaft);
+
+      const tip = new THREE.Mesh(
+        new THREE.ConeGeometry(0.20, 0.35, 3),
+        new THREE.MeshStandardMaterial({ color: 0xffffff })
+      );
+      tip.rotation.x = -Math.PI / 2;
+      tip.position.z = -0.32;
+      group.add(tip);
+
+      group.position.set(x, 0.02, z);
+      group.rotation.y = rotY;
+      layoutGroup.add(group);
+    }
+
+    function createBooth(x, z) {
+      addMesh(
+        new RoundedBoxGeometry(1.1, 0.9, 1.1, 3, 0.04),
+        new THREE.MeshStandardMaterial({ color: 0xe5e7eb }),
+        x, 0.45, z
+      );
+
+      addMesh(
+        new RoundedBoxGeometry(1.0, 0.1, 1.0, 3, 0.03),
+        new THREE.MeshStandardMaterial({ color: 0x9ca3af }),
+        x, 0.95, z
+      );
+    }
+
+    function getAngleRotation(angle) {
+      if (angle === 90) return 0;
+      if (angle === 60) return -THREE.MathUtils.degToRad(30);
+      return 0;
+    }
+
+    function getVerticalAngleRotation(angle, side) {
+      const offset = angle === 60 ? THREE.MathUtils.degToRad(30) : 0;
+      if (side === "left") return Math.PI / 2 - offset;
+      return -Math.PI / 2 + offset;
+    }
+
+    /** Same XZ rotation as THREE.Object3D.rotation.y (must match createParkingStripe mesh rotation). */
+    function offsetPoint(cx, cz, dx, dz, rotY) {
+      return {
+        x: cx + dx * Math.cos(rotY) + dz * Math.sin(rotY),
+        z: cz - dx * Math.sin(rotY) + dz * Math.cos(rotY)
+      };
+    }
+
+    function drawSlotBox(cx, cz, slotW, slotD, rotY=0) {
+      const t = 0.045;
+
+      const top = offsetPoint(cx, cz, 0, -slotD/2, rotY);
+      const bottom = offsetPoint(cx, cz, 0, slotD/2, rotY);
+      const left = offsetPoint(cx, cz, -slotW/2, 0, rotY);
+      const right = offsetPoint(cx, cz, slotW/2, 0, rotY);
+
+      createParkingStripe(top.x, top.z, slotW, t, rotY, 0xffffff);
+      createParkingStripe(bottom.x, bottom.z, slotW, t, rotY, 0xffffff);
+      createParkingStripe(left.x, left.z, t, slotD, rotY, 0xffffff);
+      createParkingStripe(right.x, right.z, t, slotD, rotY, 0xffffff);
+    }
+
+    function horizontalRowCenters(slotsPerRow, rowZ, side, angle, pitch=2.7) {
+      const total = (slotsPerRow - 1) * pitch;
+      const startX = -total / 2;
+      const centers = [];
+      const rotBase = getAngleRotation(angle);
+
+      for (let i = 0; i < slotsPerRow; i++) {
+        const x = startX + i * pitch;
+        const ry = side === "top" ? rotBase : Math.PI + rotBase;
+        centers.push({ x, z: rowZ, ry });
+      }
+      return { centers, startX, pitch };
+    }
+
+    function verticalRowCenters(slotsPerRow, rowX, side, angle=90, pitch=2.2, startZ=-5.0) {
+      const centers = [];
+      const ry = getVerticalAngleRotation(angle, side);
+      for (let i = 0; i < slotsPerRow; i++) {
+        const z = startZ + i * pitch;
+        centers.push({ x: rowX, z, ry });
+      }
+      return { centers, pitch };
+    }
+
+    function gateSidesList(params) {
+      return params.gateMode === "same" ? [params.entrySide] : [params.entrySide, params.exitSide];
+    }
+
+    /** Must match `LANE_HALF_W` in `createApproachLaneOnSide` + stall half-width (slotW/2) for clearance. */
+    function approachLaneCenterClearance(slotW) {
+      return 1.32 + slotW / 2 + 0.05;
+    }
+
+    /**
+     * Places exactly slotsPerRow stalls on a horizontal row, split left/right of the entry/exit
+     * drive lane (x gap) so count is preserved when a gate is on this side.
+     */
+    function horizontalRowCentersWithGateGap(slotsPerRow, rowZ, side, angle, pitch, bounds, params, slotW = 2.4) {
+      const halfW = approachLaneCenterClearance(slotW);
+      const rotBase = getAngleRotation(angle);
+      const ry = side === "top" ? rotBase : Math.PI + rotBase;
+      const sides = gateSidesList(params);
+      const gateHere =
+        (side === "top" && sides.includes("top")) || (side === "bottom" && sides.includes("bottom"));
+      if (!gateHere || slotsPerRow <= 0) {
+        return horizontalRowCenters(slotsPerRow, rowZ, side, angle, pitch);
+      }
+
+      const pad = 0.45;
+      const xMinL = bounds.minX + pad;
+      const xMaxL = -halfW - pad;
+      const xMinR = halfW + pad;
+      const xMaxR = bounds.maxX - pad;
+      const widthL = xMaxL - xMinL;
+      const widthR = xMaxR - xMinR;
+
+      const placeBlock = (n, xFrom, xTo) => {
+        const out = [];
+        if (n <= 0 || xTo - xFrom < 0.2) return out;
+        const total = (n - 1) * pitch;
+        const avail = xTo - xFrom;
+        const p = total > avail ? Math.max(1.75, avail / Math.max(1, n - 1)) : pitch;
+        const start = (xFrom + xTo) / 2 - ((n - 1) * p) / 2;
+        for (let i = 0; i < n; i++) {
+          out.push({ x: start + i * p, z: rowZ, ry });
+        }
+        return out;
+      };
+
+      let centers = [];
+      if (widthL <= 0 && widthR > 0) {
+        centers = placeBlock(slotsPerRow, xMinR, xMaxR);
+      } else if (widthR <= 0 && widthL > 0) {
+        centers = placeBlock(slotsPerRow, xMinL, xMaxL);
+      } else if (widthL <= 0 && widthR <= 0) {
+        return horizontalRowCenters(slotsPerRow, rowZ, side, angle, pitch);
+      } else {
+        const nLeft = Math.ceil(slotsPerRow / 2);
+        const nRight = slotsPerRow - nLeft;
+        centers = [...placeBlock(nLeft, xMinL, xMaxL), ...placeBlock(nRight, xMinR, xMaxR)];
+      }
+
+      if (centers.length < slotsPerRow) {
+        return horizontalRowCenters(slotsPerRow, rowZ, side, angle, pitch);
+      }
+
+      centers.sort((a, b) => a.x - b.x);
+      return { centers, startX: centers[0].x, pitch };
+    }
+
+    /**
+     * Places exactly slotsPerRow stalls on a vertical row, split across z below/above the drive lane
+     * when a gate is on this side.
+     */
+    function verticalRowCentersWithGateGap(slotsPerRow, rowX, side, angle, pitch, startZ, bounds, params, slotW = 2.2) {
+      const halfW = approachLaneCenterClearance(slotW);
+      const ry = getVerticalAngleRotation(angle, side);
+      const sides = gateSidesList(params);
+      const gateHere =
+        (side === "left" && sides.includes("left")) || (side === "right" && sides.includes("right"));
+      if (!gateHere || slotsPerRow <= 0) {
+        return verticalRowCenters(slotsPerRow, rowX, side, angle, pitch, startZ);
+      }
+
+      const pad = 0.45;
+      const zMinLo = bounds.minZ + pad;
+      const zMaxLo = -halfW - pad;
+      const zMinHi = halfW + pad;
+      const zMaxHi = bounds.maxZ - pad;
+      const spanLo = zMaxLo - zMinLo;
+      const spanHi = zMaxHi - zMinHi;
+
+      const placeBlock = (n, zFrom, zTo) => {
+        const out = [];
+        if (n <= 0 || zTo - zFrom < 0.2) return out;
+        const total = (n - 1) * pitch;
+        const avail = zTo - zFrom;
+        const p = total > avail ? Math.max(1.5, avail / Math.max(1, n - 1)) : pitch;
+        const start = (zFrom + zTo) / 2 - ((n - 1) * p) / 2;
+        for (let i = 0; i < n; i++) {
+          out.push({ x: rowX, z: start + i * p, ry });
+        }
+        return out;
+      };
+
+      let centers = [];
+      if (spanLo <= 0 && spanHi > 0) {
+        centers = placeBlock(slotsPerRow, zMinHi, zMaxHi);
+      } else if (spanHi <= 0 && spanLo > 0) {
+        centers = placeBlock(slotsPerRow, zMinLo, zMaxLo);
+      } else if (spanLo <= 0 && spanHi <= 0) {
+        return verticalRowCenters(slotsPerRow, rowX, side, angle, pitch, startZ);
+      } else {
+        const nLo = Math.ceil(slotsPerRow / 2);
+        const nHi = slotsPerRow - nLo;
+        centers = [...placeBlock(nLo, zMinLo, zMaxLo), ...placeBlock(nHi, zMinHi, zMaxHi)];
+      }
+
+      if (centers.length < slotsPerRow) {
+        return verticalRowCenters(slotsPerRow, rowX, side, angle, pitch, startZ);
+      }
+
+      centers.sort((a, b) => a.z - b.z);
+      return { centers, pitch };
+    }
+
+    function drawRowBoxes(centers, slotW=2.4, slotD=5.0) {
+      centers.forEach(c => drawSlotBox(c.x, c.z, slotW, slotD, c.ry));
+    }
+
+    /** Local (dx,dz) → world XZ offset — must match offsetPoint(cx,cz,dx,dz,ry). */
+    function stallLocalToWorldXZ(dx, dz, ry) {
+      return {
+        x: dx * Math.cos(ry) + dz * Math.sin(ry),
+        z: -dx * Math.sin(ry) + dz * Math.cos(ry)
+      };
+    }
+
+    function stallWorldCorners(cx, cz, slotW, slotD, ry) {
+      const hw = slotW / 2;
+      const hd = slotD / 2;
+      return [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd]].map(([dx, dz]) => {
+        const w = stallLocalToWorldXZ(dx, dz, ry);
+        return { x: cx + w.x, z: cz + w.z };
+      });
+    }
+
+    function projectOnAxis(corners, ax) {
+      const dots = corners.map(p => p.x * ax.x + p.z * ax.z);
+      return { min: Math.min(...dots), max: Math.max(...dots) };
+    }
+
+    function intervalsOverlap(aMin, aMax, bMin, bMax) {
+      return !(aMax < bMin || bMax < aMin);
+    }
+
+    /** SAT overlap for two convex quads (stall footprints in XZ). */
+    function satPolygonOverlap(cornersA, cornersB) {
+      const axes = [];
+      for (const poly of [cornersA, cornersB]) {
+        for (let i = 0; i < poly.length; i++) {
+          const j = (i + 1) % poly.length;
+          const ex = poly[j].x - poly[i].x;
+          const ez = poly[j].z - poly[i].z;
+          const len = Math.hypot(ex, ez);
+          if (len < 1e-8) continue;
+          axes.push({ x: -ez / len, z: ex / len });
+        }
+      }
+      for (const ax of axes) {
+        const pa = projectOnAxis(cornersA, ax);
+        const pb = projectOnAxis(cornersB, ax);
+        if (!intervalsOverlap(pa.min, pa.max, pb.min, pb.max)) return false;
+      }
+      return true;
+    }
+
+    function stallFootprintsOverlap2D(c1, slotW1, slotD1, c2, slotW2, slotD2) {
+      const polyA = stallWorldCorners(c1.x, c1.z, slotW1, slotD1, c1.ry);
+      const polyB = stallWorldCorners(c2.x, c2.z, slotW2, slotD2, c2.ry);
+      return satPolygonOverlap(polyA, polyB);
+    }
+
+    /** Remove vertical-arm stalls whose rectangles overlap any horizontal-arm stall (L/U inner corners). */
+    function filterVerticalAgainstHorizontalArms(verticalCenters, slotWv, slotDv, horizontalCenters, slotWh, slotDh) {
+      return verticalCenters.filter(
+        v => !horizontalCenters.some(h => stallFootprintsOverlap2D(h, slotWh, slotDh, v, slotWv, slotDv))
+      );
+    }
+
+    function placeCarsFromCenters(centers, patternOffset = 0, skipIndex = -1) {
+      centers.forEach((p, i) => {
+        if (i === skipIndex) return;
+        if ((i + patternOffset) % 2 === 0) {
+          createCar(p.x, p.z, p.ry, carColors[(i + patternOffset) % carColors.length]);
+        }
+      });
+    }
+
+    let notchConfigs = [
+      { enabled: true, side: "top", posPercent: 25, width: 5, depth: 3 },
+      { enabled: true, side: "bottom", posPercent: 35, width: 5, depth: 3 }
+    ];
+
+    function createDefaultNotch(index) {
+      const defaults = [
+        { enabled: true, side: "top", posPercent: 25, width: 5, depth: 3 },
+        { enabled: true, side: "bottom", posPercent: 35, width: 5, depth: 3 },
+        { enabled: false, side: "left", posPercent: 50, width: 4, depth: 3 },
+        { enabled: false, side: "right", posPercent: 50, width: 4, depth: 3 },
+        { enabled: false, side: "topLeft", posPercent: 0, width: 4, depth: 3 },
+        { enabled: false, side: "bottomRight", posPercent: 0, width: 4, depth: 3 }
+      ];
+
+      const preset = defaults[index] || defaults[defaults.length - 1];
+      return { ...preset };
+    }
+
+    function notchSideOptions(selectedSide) {
+      const options = [
+        ["top", "Top"],
+        ["bottom", "Bottom"],
+        ["left", "Left"],
+        ["right", "Right"],
+        ["topLeft", "Top Left Corner"],
+        ["topRight", "Top Right Corner"],
+        ["bottomLeft", "Bottom Left Corner"],
+        ["bottomRight", "Bottom Right Corner"]
+      ];
+
+      return options.map(([value, label]) => `
+        <option value="${value}" ${selectedSide === value ? "selected" : ""}>${label}</option>
+      `).join("");
+    }
+
+    function renderNotchCards() {
+      const notchGrid = document.getElementById("notchGrid");
+      const countLabel = document.getElementById("notchCountLabel");
+
+      notchGrid.innerHTML = notchConfigs.map((notch, index) => {
+        const notchNumber = index + 1;
+        const isCorner = notch.side.includes("Left") || notch.side.includes("Right");
+        const positionField = isCorner ? "" : `
+          <div class="field">
+            <label for="notch${notchNumber}_pos">Position %</label>
+            <input id="notch${notchNumber}_pos" type="number" value="${notch.posPercent}" min="0" max="100" />
+          </div>
+        `;
+
+        return `
+          <div class="notch-card" data-notch-index="${index}">
+            <div class="notch-title">Notch ${notchNumber}</div>
+            <div class="checkbox-row">
+              <input id="notch${notchNumber}_enabled" type="checkbox" ${notch.enabled ? "checked" : ""} />
+              <label for="notch${notchNumber}_enabled">Enable</label>
+            </div>
+            <div class="mini-grid">
+              <div class="field">
+                <label for="notch${notchNumber}_side">Side</label>
+                <select id="notch${notchNumber}_side">${notchSideOptions(notch.side)}</select>
+              </div>
+              ${positionField}
+              <div class="field">
+                <label for="notch${notchNumber}_width">Width (m)</label>
+                <input id="notch${notchNumber}_width" type="number" value="${notch.width}" />
+              </div>
+              <div class="field">
+                <label for="notch${notchNumber}_depth">Depth (m)</label>
+                <input id="notch${notchNumber}_depth" type="number" value="${notch.depth}" />
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      countLabel.textContent = notchConfigs.length;
+    }
+
+    function syncNotchCardsToState() {
+      notchConfigs = notchConfigs.map((notch, index) => {
+        const notchNumber = index + 1;
+        const enabledEl = document.getElementById(`notch${notchNumber}_enabled`);
+        const sideEl = document.getElementById(`notch${notchNumber}_side`);
+        const posEl = document.getElementById(`notch${notchNumber}_pos`);
+        const widthEl = document.getElementById(`notch${notchNumber}_width`);
+        const depthEl = document.getElementById(`notch${notchNumber}_depth`);
+
+        return {
+          enabled: enabledEl ? enabledEl.checked : notch.enabled,
+          side: sideEl ? sideEl.value : notch.side,
+          posPercent: posEl ? (parseFloat(posEl.value) || 0) : 0,
+          width: widthEl ? (parseFloat(widthEl.value) || 0) : notch.width,
+          depth: depthEl ? (parseFloat(depthEl.value) || 0) : notch.depth
+        };
+      });
+    }
+
+    function addNotchCard() {
+      syncNotchCardsToState();
+      notchConfigs.push(createDefaultNotch(notchConfigs.length));
+      renderNotchCards();
+    }
+
+    function removeNotchCard() {
+      if (notchConfigs.length === 0) return;
+      syncNotchCardsToState();
+      notchConfigs.pop();
+      renderNotchCards();
+    }
+
+    function getNotchList() {
+      syncNotchCardsToState();
+      return notchConfigs
+        .filter(notch => notch.enabled)
+        .map(notch => ({
+          side: notch.side,
+          posPercent: notch.side.includes("Left") || notch.side.includes("Right") ? 0 : notch.posPercent,
+          width: notch.width,
+          depth: notch.depth
+        }));
+    }
+
+    function commonParams() {
+      return {
+        terrainType: document.getElementById("terrainType").value,
+        layoutType: document.getElementById("layoutType").value,
+        w: parseFloat(document.getElementById("width").value) || 36,
+        h: parseFloat(document.getElementById("height").value) || 20,
+        notches: getNotchList(),
+        slotsPerRow: parseInt(document.getElementById("slotsPerRow").value) || 8,
+        angle: parseInt(document.getElementById("parkingAngle").value) || 90,
+        gateMode: document.getElementById("gateMode").value,
+        entrySide: document.getElementById("entrySide").value,
+        exitSide: document.getElementById("exitSide").value,
+        trees: Math.max(0, parseInt(document.getElementById("trees").value, 10) || 0),
+        islands: Math.max(0, parseInt(document.getElementById("islands").value, 10) || 0),
+        rocks: Math.max(0, parseInt(document.getElementById("rocks").value, 10) || 0),
+        disabledArea: document.getElementById("disabledArea").value,
+        treePosition: document.getElementById("treePosition").value,
+        obstaclePosition: document.getElementById("obstaclePosition").value,
+        treeShiftX: (parseFloat(document.getElementById("treeShiftX").value) || 0) / 100,
+        treeShiftZ: (parseFloat(document.getElementById("treeShiftZ").value) || 0) / 100,
+        obstacleShiftX: (parseFloat(document.getElementById("obstacleShiftX").value) || 0) / 100,
+        obstacleShiftZ: (parseFloat(document.getElementById("obstacleShiftZ").value) || 0) / 100
+      };
+    }
+
+    function validateLayout(params) {
+      const warningBox = document.getElementById("warningBox");
+      let neededWidth = 0;
+
+      if (params.layoutType === "rectangle") {
+        neededWidth = params.slotsPerRow * 2.7 + 8;
+      } else if (params.layoutType === "centeredRectangle") {
+        neededWidth = params.slotsPerRow * 2.45 + 10;
+      } else if (params.layoutType === "lshape") {
+        neededWidth = params.slotsPerRow * 2.45 + 14;
+      } else if (params.layoutType === "ushape") {
+        neededWidth = params.slotsPerRow * 2.2 + 16;
+      }
+
+      if (params.w < neededWidth) {
+        warningBox.value = `Width too small. Increase width to at least ${Math.ceil(neededWidth)} m`;
+        return false;
+      }
+
+      if (params.terrainType === "customNotches") {
+        if (params.notches.length === 0) {
+          warningBox.value = "Enable at least one notch or choose Regular Terrain";
+          return false;
+        }
+
+        for (let i = 0; i < params.notches.length; i++) {
+          const n = params.notches[i];
+
+          if (n.width <= 0 || n.depth <= 0) {
+            warningBox.value = `Notch ${i + 1}: width and depth must be greater than 0`;
+            return false;
+          }
+
+          if (n.side === "top" || n.side === "bottom") {
+            if (n.width >= params.w - 1) {
+              warningBox.value = `Notch ${i + 1}: width too large for top/bottom side`;
+              return false;
+            }
+            if (n.depth >= params.h - 2) {
+              warningBox.value = `Notch ${i + 1}: depth too large for terrain height`;
+              return false;
+            }
+          } else if (n.side === "left" || n.side === "right") {
+            if (n.width >= params.h - 1) {
+              warningBox.value = `Notch ${i + 1}: width too large for left/right side`;
+              return false;
+            }
+            if (n.depth >= params.w - 2) {
+              warningBox.value = `Notch ${i + 1}: depth too large for terrain width`;
+              return false;
+            }
+          } else {
+            if (n.width >= params.w - 1) {
+              warningBox.value = `Notch ${i + 1}: width too large for corner notch`;
+              return false;
+            }
+            if (n.depth >= params.h - 1) {
+              warningBox.value = `Notch ${i + 1}: depth too large for corner notch`;
+              return false;
+            }
+          }
+        }
+      }
+
+      warningBox.value = "No warning";
+      return true;
+    }
+
+    function notchToRect(n, w, h) {
+      const hw = w / 2;
+      const hh = h / 2;
+
+      if (n.side === "top" || n.side === "bottom") {
+        const centerX = -hw + (n.posPercent / 100) * w;
+        let x1 = centerX - n.width / 2;
+        let x2 = centerX + n.width / 2;
+
+        if (x1 < -hw) {
+          x2 += (-hw - x1);
+          x1 = -hw;
+        }
+        if (x2 > hw) {
+          x1 -= (x2 - hw);
+          x2 = hw;
+        }
+
+        if (n.side === "top") {
+          return { minX: x1, maxX: x2, minZ: -hh, maxZ: -hh + n.depth, side: "top" };
+        }
+        return { minX: x1, maxX: x2, minZ: hh - n.depth, maxZ: hh, side: "bottom" };
+      }
+
+      if (n.side === "left" || n.side === "right") {
+        const centerZ = -hh + (n.posPercent / 100) * h;
+        let z1 = centerZ - n.width / 2;
+        let z2 = centerZ + n.width / 2;
+
+        if (z1 < -hh) {
+          z2 += (-hh - z1);
+          z1 = -hh;
+        }
+        if (z2 > hh) {
+          z1 -= (z2 - hh);
+          z2 = hh;
+        }
+
+        if (n.side === "left") {
+          return { minX: -hw, maxX: -hw + n.depth, minZ: z1, maxZ: z2, side: "left" };
+        }
+        return { minX: hw - n.depth, maxX: hw, minZ: z1, maxZ: z2, side: "right" };
+      }
+
+      if (n.side === "topLeft") {
+        return { minX: -hw, maxX: -hw + n.width, minZ: -hh, maxZ: -hh + n.depth, side: "topLeft" };
+      }
+      if (n.side === "topRight") {
+        return { minX: hw - n.width, maxX: hw, minZ: -hh, maxZ: -hh + n.depth, side: "topRight" };
+      }
+      if (n.side === "bottomLeft") {
+        return { minX: -hw, maxX: -hw + n.width, minZ: hh - n.depth, maxZ: hh, side: "bottomLeft" };
+      }
+      return { minX: hw - n.width, maxX: hw, minZ: hh - n.depth, maxZ: hh, side: "bottomRight" };
+    }
+
+    function pointInsideTerrain(x, z, terrain) {
+      const { w, h, notchRects } = terrain;
+      const hw = w / 2;
+      const hh = h / 2;
+
+      if (x < -hw || x > hw || z < -hh || z > hh) return false;
+
+      for (const r of notchRects) {
+        if (x > r.minX && x < r.maxX && z > r.minZ && z < r.maxZ) return false;
+      }
+
+      return true;
+    }
+
+    function slotFitsInTerrain(cx, cz, slotW, slotD, rotY, terrain) {
+      const corners = [
+        offsetPoint(cx, cz, -slotW/2, -slotD/2, rotY),
+        offsetPoint(cx, cz,  slotW/2, -slotD/2, rotY),
+        offsetPoint(cx, cz,  slotW/2,  slotD/2, rotY),
+        offsetPoint(cx, cz, -slotW/2,  slotD/2, rotY)
+      ];
+      return corners.every(p => pointInsideTerrain(p.x, p.z, terrain));
+    }
+
+    function filterCentersByTerrain(centers, slotW, slotD, terrain) {
+      return centers.filter(c => slotFitsInTerrain(c.x, c.z, slotW, slotD, c.ry, terrain));
+    }
+
+    function buildTerrainCells(terrain) {
+      const hw = terrain.w / 2;
+      const hh = terrain.h / 2;
+
+      const xs = [-hw, hw];
+      const zs = [-hh, hh];
+
+      for (const r of terrain.notchRects) {
+        xs.push(r.minX, r.maxX);
+        zs.push(r.minZ, r.maxZ);
+      }
+
+      xs.sort((a,b) => a-b);
+      zs.sort((a,b) => a-b);
+
+      const uniqueXs = xs.filter((v, i, arr) => i === 0 || Math.abs(v - arr[i-1]) > 0.0001);
+      const uniqueZs = zs.filter((v, i, arr) => i === 0 || Math.abs(v - arr[i-1]) > 0.0001);
+
+      const cells = [];
+      const cellMap = new Map();
+
+      for (let zi = 0; zi < uniqueZs.length - 1; zi++) {
+        for (let xi = 0; xi < uniqueXs.length - 1; xi++) {
+          const x1 = uniqueXs[xi];
+          const x2 = uniqueXs[xi + 1];
+          const z1 = uniqueZs[zi];
+          const z2 = uniqueZs[zi + 1];
+          const cx = (x1 + x2) / 2;
+          const cz = (z1 + z2) / 2;
+
+          if (!pointInsideTerrain(cx, cz, terrain)) continue;
+
+          const cell = { xi, zi, x1, x2, z1, z2, cx, cz, w: x2 - x1, d: z2 - z1 };
+          cells.push(cell);
+          cellMap.set(`${xi},${zi}`, cell);
+        }
+      }
+
+      return { cells, cellMap, xs: uniqueXs, zs: uniqueZs };
+    }
+
+    function createGroundFromTerrainCells(terrain) {
+      const { cells } = buildTerrainCells(terrain);
+
+      cells.forEach(cell => {
+        const mat = MAT.asphalt;
+        const m = new THREE.Mesh(
+          new THREE.BoxGeometry(cell.w + 0.01, 0.22, cell.d + 0.01),
+          mat
+        );
+        m.position.set(cell.cx, -0.11, cell.cz);
+        m.receiveShadow = true;
+        layoutGroup.add(m);
+      });
+    }
+
+    /** Raised white concrete curb; leaves gaps aligned with fence gate openings (3.6 m). */
+    function createPerimeterCurb(bounds, gateSidesList) {
+      const w = 0.42;
+      const h = 0.12;
+      const y = h / 2 + 0.008;
+      const gap = 3.6;
+      const gh = gap / 2;
+      const gateSides = new Set(gateSidesList || []);
+
+      const xMin = bounds.minX + w;
+      const xMax = bounds.maxX - w;
+      const zMin = bounds.minZ + w;
+      const zMax = bounds.maxZ - w;
+      const zTop = bounds.minZ + w / 2;
+      const zBot = bounds.maxZ - w / 2;
+      const xLeft = bounds.minX + w / 2;
+      const xRight = bounds.maxX - w / 2;
+
+      function addCurb(cx, cz, bw, bd) {
+        addMesh(new THREE.BoxGeometry(bw, h, bd), MAT.curb, cx, y, cz);
+      }
+
+      if (gateSides.has("top")) {
+        if (xMin < -gh - 0.05) addCurb((xMin + (-gh)) / 2, zTop, (-gh) - xMin, w);
+        if (gh < xMax - 0.05) addCurb((gh + xMax) / 2, zTop, xMax - gh, w);
+      } else {
+        addCurb((xMin + xMax) / 2, zTop, xMax - xMin, w);
+      }
+
+      if (gateSides.has("bottom")) {
+        if (xMin < -gh - 0.05) addCurb((xMin + (-gh)) / 2, zBot, (-gh) - xMin, w);
+        if (gh < xMax - 0.05) addCurb((gh + xMax) / 2, zBot, xMax - gh, w);
+      } else {
+        addCurb((xMin + xMax) / 2, zBot, xMax - xMin, w);
+      }
+
+      if (gateSides.has("left")) {
+        if (zMin < -gh - 0.05) addCurb(xLeft, (zMin + (-gh)) / 2, w, (-gh) - zMin);
+        if (gh < zMax - 0.05) addCurb(xLeft, (gh + zMax) / 2, w, zMax - gh);
+      } else {
+        addCurb(xLeft, (zMin + zMax) / 2, w, zMax - zMin);
+      }
+
+      if (gateSides.has("right")) {
+        if (zMin < -gh - 0.05) addCurb(xRight, (zMin + (-gh)) / 2, w, (-gh) - zMin);
+        if (gh < zMax - 0.05) addCurb(xRight, (gh + zMax) / 2, w, zMax - gh);
+      } else {
+        addCurb(xRight, (zMin + zMax) / 2, w, zMax - zMin);
+      }
+    }
+
+    function createFenceFromTerrainCells(terrain, gateSides) {
+      const { cells, cellMap } = buildTerrainCells(terrain);
+      const hw = terrain.w / 2;
+      const hh = terrain.h / 2;
+      const gapSize = 3.6;
+
+      const gateAnchors = {};
+      const gateRanges = {};
+
+      function setGateRange(side) {
+        if (side === "top" || side === "bottom") {
+          gateRanges[side] = { start: -gapSize / 2, end: gapSize / 2 };
+          gateAnchors[side] = {
+            x: 0,
+            z: side === "top" ? -hh : hh,
+            ry: side === "top" ? Math.PI : 0
+          };
+        } else {
+          gateRanges[side] = { start: -gapSize / 2, end: gapSize / 2 };
+          gateAnchors[side] = {
+            x: side === "left" ? -hw : hw,
+            z: 0,
+            ry: side === "left" ? Math.PI / 2 : -Math.PI / 2
+          };
+        }
+      }
+
+      gateSides.forEach(setGateRange);
+
+      function drawWithGateOnBoundary(side, x1, z1, x2, z2) {
+        if (!gateSides.includes(side)) {
+          makeFenceSegment(x1, z1, x2, z2);
+          return;
+        }
+
+        const range = gateRanges[side];
+
+        if (side === "top" || side === "bottom") {
+          const segA = Math.min(x1, x2);
+          const segB = Math.max(x1, x2);
+          const openA = range.start;
+          const openB = range.end;
+
+          if (segB <= openA || segA >= openB) {
+            makeFenceSegment(x1, z1, x2, z2);
+            return;
+          }
+
+          if (segA < openA) makeFenceSegment(segA, z1, openA, z1);
+          if (segB > openB) makeFenceSegment(openB, z1, segB, z1);
+        } else {
+          const segA = Math.min(z1, z2);
+          const segB = Math.max(z1, z2);
+          const openA = range.start;
+          const openB = range.end;
+
+          if (segB <= openA || segA >= openB) {
+            makeFenceSegment(x1, z1, x2, z2);
+            return;
+          }
+
+          if (segA < openA) makeFenceSegment(x1, segA, x1, openA);
+          if (segB > openB) makeFenceSegment(x1, openB, x1, segB);
+        }
+      }
+
+      for (const c of cells) {
+        const leftNeighbor   = cellMap.get(`${c.xi - 1},${c.zi}`);
+        const rightNeighbor  = cellMap.get(`${c.xi + 1},${c.zi}`);
+        const topNeighbor    = cellMap.get(`${c.xi},${c.zi - 1}`);
+        const bottomNeighbor = cellMap.get(`${c.xi},${c.zi + 1}`);
+
+        if (!topNeighbor) {
+          if (Math.abs(c.z1 + hh) < 0.0001) drawWithGateOnBoundary("top", c.x1, c.z1, c.x2, c.z1);
+          else makeFenceSegment(c.x1, c.z1, c.x2, c.z1);
+        }
+
+        if (!bottomNeighbor) {
+          if (Math.abs(c.z2 - hh) < 0.0001) drawWithGateOnBoundary("bottom", c.x1, c.z2, c.x2, c.z2);
+          else makeFenceSegment(c.x1, c.z2, c.x2, c.z2);
+        }
+
+        if (!leftNeighbor) {
+          if (Math.abs(c.x1 + hw) < 0.0001) drawWithGateOnBoundary("left", c.x1, c.z1, c.x1, c.z2);
+          else makeFenceSegment(c.x1, c.z1, c.x1, c.z2);
+        }
+
+        if (!rightNeighbor) {
+          if (Math.abs(c.x2 - hw) < 0.0001) drawWithGateOnBoundary("right", c.x2, c.z1, c.x2, c.z2);
+          else makeFenceSegment(c.x2, c.z1, c.x2, c.z2);
+        }
+      }
+
+      return gateAnchors;
+    }
+
+    function createTerrain(params) {
+      const terrain = {
+        w: params.w,
+        h: params.h,
+        notchRects: []
+      };
+
+      if (params.terrainType === "customNotches") {
+        terrain.notchRects = params.notches.map(n => notchToRect(n, params.w, params.h));
+      }
+
+      createGroundFromTerrainCells(terrain);
+
+      const bounds = {
+        minX: -params.w / 2,
+        maxX: params.w / 2,
+        minZ: -params.h / 2,
+        maxZ: params.h / 2
+      };
+      const gateSidesList =
+        params.gateMode === "same" ? [params.entrySide] : [params.entrySide, params.exitSide];
+      createPerimeterCurb(bounds, gateSidesList);
+
+      const gateAnchors = createFenceFromTerrainCells(terrain, gateSidesList);
+
+      return {
+        terrain,
+        bounds,
+        gateAnchors
+      };
+    }
+
+    function isNearGate(x, z, bounds, entrySide, exitSide, gateMode) {
+      const margin = 2.5;
+      const sides = gateMode === "same" ? [entrySide] : [entrySide, exitSide];
+
+      for (const side of sides) {
+        if (side === "top" && Math.abs(z - bounds.minZ) < margin) return true;
+        if (side === "bottom" && Math.abs(z - bounds.maxZ) < margin) return true;
+        if (side === "left" && Math.abs(x - bounds.minX) < margin) return true;
+        if (side === "right" && Math.abs(x - bounds.maxX) < margin) return true;
+      }
+      return false;
+    }
+
+    function placeTreesByPosition(params, terrain, bounds) {
+      const { treePosition, trees, islands, treeShiftX, treeShiftZ, entrySide, exitSide, gateMode } = params;
+      let blocked = false;
+
+      if (trees <= 0) return;
+
+      function addTreeIsland(x, z, wv = 1.8, hv = 0.9) {
+        const fx = x + treeShiftX;
+        const fz = z + treeShiftZ;
+
+        if (!slotFitsInTerrain(fx, fz, wv, hv, 0, terrain)) return;
+
+        if (isNearGate(fx, fz, bounds, entrySide, exitSide, gateMode)) {
+          blocked = true;
+          return;
+        }
+
+        createIsland(fx, fz, wv, hv, true);
+      }
+
+      if (treePosition === "center") {
+        const count = Math.max(0, islands);
+        if (count <= 0) return;
+        const step = 3.0;
+        const start = -((count - 1) * step) / 2;
+        for (let i = 0; i < Math.min(trees, count); i++) {
+          addTreeIsland(start + i * step, 0);
+        }
+      } else if (treePosition === "top") {
+        for (let i = 0; i < trees; i++) {
+          addTreeIsland(bounds.minX + 4 + i * 2.8, bounds.minZ + 2.5);
+        }
+      } else if (treePosition === "bottom") {
+        for (let i = 0; i < trees; i++) {
+          addTreeIsland(bounds.minX + 4 + i * 2.8, bounds.maxZ - 2.5);
+        }
+      } else if (treePosition === "left") {
+        for (let i = 0; i < trees; i++) {
+          addTreeIsland(bounds.minX + 2.5, bounds.minZ + 4 + i * 2.4);
+        }
+      } else if (treePosition === "right") {
+        for (let i = 0; i < trees; i++) {
+          addTreeIsland(bounds.maxX - 2.5, bounds.minZ + 4 + i * 2.4);
+        }
+      }
+
+      if (blocked) {
+        document.getElementById("warningBox").value = "Tree removed: cannot place tree in front of gate";
+      }
+    }
+
+    function placeObstacleZoneByPosition(params, terrain, bounds) {
+      const { obstaclePosition, rocks, obstacleShiftX, obstacleShiftZ } = params;
+      if (rocks <= 0) return;
+
+      function addZone(x, z) {
+        const fx = x + obstacleShiftX;
+        const fz = z + obstacleShiftZ;
+        if (slotFitsInTerrain(fx, fz, 5.2, 2.3, 0, terrain)) {
+          createRockZone(fx, fz, 5.2, 2.3, rocks);
+        }
+      }
+
+      if (obstaclePosition === "topRight") {
+        addZone(bounds.maxX - 4.2, bounds.minZ + 2.2);
+      } else if (obstaclePosition === "topLeft") {
+        addZone(bounds.minX + 4.2, bounds.minZ + 2.2);
+      } else if (obstaclePosition === "bottomRight") {
+        addZone(bounds.maxX - 4.2, bounds.maxZ - 2.2);
+      } else if (obstaclePosition === "bottomLeft") {
+        addZone(bounds.minX + 4.2, bounds.maxZ - 2.2);
+      } else {
+        addZone(0, 0);
+      }
+    }
+
+    function lampPointInSlotFootprint(px, pz, slot, margin) {
+      const { x: cx, z: cz, ry, slotW, slotD } = slot;
+      const dx = px - cx;
+      const dz = pz - cz;
+      const lx = dx * Math.cos(ry) + dz * Math.sin(ry);
+      const lz = -dx * Math.sin(ry) + dz * Math.cos(ry);
+      return Math.abs(lx) < slotW / 2 + margin && Math.abs(lz) < slotD / 2 + margin;
+    }
+
+    function lampOverlapsAnyStall(px, pz, slots, margin) {
+      return slots.some(s => lampPointInSlotFootprint(px, pz, s, margin));
+    }
+
+    /** Matches createApproachLaneOnSide — entry/exit drive strips at gates. */
+    function lampPointInGateApproachLane(px, pz, bounds, params) {
+      const { LANE_LEN, inset } = getGateApproachMetrics(bounds);
+      const LANE_HALF_W = 1.32;
+      const m = 0.5;
+      const sides =
+        params.gateMode === "same" ? [params.entrySide] : [params.entrySide, params.exitSide];
+      const seen = new Set();
+      for (const side of sides) {
+        if (!side || seen.has(side)) continue;
+        seen.add(side);
+        if (side === "top") {
+          const z0 = bounds.minZ + inset;
+          const z1 = z0 + LANE_LEN;
+          if (pz >= z0 - m && pz <= z1 + m && Math.abs(px) <= LANE_HALF_W + m) return true;
+        } else if (side === "bottom") {
+          const z1 = bounds.maxZ - inset;
+          const z0 = z1 - LANE_LEN;
+          if (pz >= z0 - m && pz <= z1 + m && Math.abs(px) <= LANE_HALF_W + m) return true;
+        } else if (side === "left") {
+          const x0 = bounds.minX + inset;
+          const x1 = x0 + LANE_LEN;
+          if (px >= x0 - m && px <= x1 + m && Math.abs(pz) <= LANE_HALF_W + m) return true;
+        } else if (side === "right") {
+          const x1 = bounds.maxX - inset;
+          const x0 = x1 - LANE_LEN;
+          if (px >= x0 - m && px <= x1 + m && Math.abs(pz) <= LANE_HALF_W + m) return true;
+        }
+      }
+      return false;
+    }
+
+    /** Open z-band between two horizontal stall rows (main through lane), same geometry as layout rows. */
+    function lampPointInInterRowDriveAisle(px, pz, params, bounds) {
+      const edge = 0.55;
+      const slotD = 5;
+      const halfD = slotD / 2;
+      let rowTopZ;
+      let rowBottomZ;
+      if (params.layoutType === "rectangle") {
+        rowTopZ = -6.2;
+        rowBottomZ = 6.2;
+      } else if (params.layoutType === "centeredRectangle") {
+        rowTopZ = -2.8;
+        rowBottomZ = 2.8;
+      } else {
+        return false;
+      }
+      const zInnerTop = rowTopZ + halfD;
+      const zInnerBottom = rowBottomZ - halfD;
+      if (zInnerTop >= zInnerBottom) return false;
+      if (px < bounds.minX + edge || px > bounds.maxX - edge) return false;
+      return pz > zInnerTop && pz < zInnerBottom;
+    }
+
+    /** L-shape: inner corner drive (below bottom row, left of right row). */
+    function lampPointInLShapeCentralDrive(px, pz, params, bounds) {
+      if (params.layoutType !== "lshape") return false;
+      const edge = 0.55;
+      const rowBz = 4.8;
+      const rowRx = params.w / 2 - 4.0;
+      const innerZ = rowBz - 2.5;
+      const innerX = rowRx - 1.1;
+      return px > bounds.minX + edge && px < innerX && pz > bounds.minZ + edge && pz < innerZ;
+    }
+
+    /** U-shape: enclosed court between the three arms. */
+    function lampPointInUShapeCentralDrive(px, pz, params, bounds) {
+      if (params.layoutType !== "ushape") return false;
+      const edge = 0.55;
+      const leftX = -params.w / 2 + 4.0;
+      const rightX = params.w / 2 - 4.0;
+      const topZ = -params.h / 2 + 4.6;
+      const x0 = leftX + 1.1;
+      const x1 = rightX - 1.1;
+      const z0 = topZ + 2.5;
+      const z1 = bounds.maxZ - edge;
+      if (x0 >= x1 || z0 >= z1) return false;
+      return px > x0 && px < x1 && pz > z0 && pz < z1;
+    }
+
+    function lampPositionInvalid(px, pz, slots, margin, params, bounds) {
+      if (lampOverlapsAnyStall(px, pz, slots, margin)) return true;
+      if (lampPointInGateApproachLane(px, pz, bounds, params)) return true;
+      if (lampPointInInterRowDriveAisle(px, pz, params, bounds)) return true;
+      if (lampPointInLShapeCentralDrive(px, pz, params, bounds)) return true;
+      if (lampPointInUShapeCentralDrive(px, pz, params, bounds)) return true;
+      return false;
+    }
+
+    /** Same stall rows as drawRowBoxes / build* — used to keep lamp poles out of parking slots. */
+    function collectSlotCentersForLamps(params, bounds, terrain) {
+      const angle = params.angle;
+      const out = [];
+      function add(centers, slotW, slotD) {
+        centers.forEach(c => out.push({ x: c.x, z: c.z, ry: c.ry, slotW, slotD }));
+      }
+
+      if (params.layoutType === "rectangle") {
+        let top = horizontalRowCentersWithGateGap(params.slotsPerRow, -6.2, "top", angle, 2.7, bounds, params, 2.4);
+        let bottom = horizontalRowCentersWithGateGap(params.slotsPerRow, 6.2, "bottom", angle, 2.7, bounds, params, 2.4);
+        if (params.terrainType === "customNotches") {
+          top.centers = filterCentersByTerrain(top.centers, 2.4, 5.0, terrain);
+          bottom.centers = filterCentersByTerrain(bottom.centers, 2.4, 5.0, terrain);
+        }
+        add(top.centers, 2.4, 5.0);
+        add(bottom.centers, 2.4, 5.0);
+      } else if (params.layoutType === "centeredRectangle") {
+        const innerSlots = Math.min(Math.max(params.slotsPerRow, 4), 16);
+        let top = horizontalRowCentersWithGateGap(innerSlots, -2.8, "top", angle, 2.45, bounds, params, 2.3);
+        let bottom = horizontalRowCentersWithGateGap(innerSlots, 2.8, "bottom", angle, 2.45, bounds, params, 2.3);
+        if (params.terrainType === "customNotches") {
+          top.centers = filterCentersByTerrain(top.centers, 2.3, 5.0, terrain);
+          bottom.centers = filterCentersByTerrain(bottom.centers, 2.3, 5.0, terrain);
+        }
+        add(top.centers, 2.3, 5.0);
+        add(bottom.centers, 2.3, 5.0);
+      } else if (params.layoutType === "lshape") {
+        const bottomSlots = Math.min(Math.max(params.slotsPerRow, 5), 16);
+        const rightSlots = Math.min(Math.max(Math.floor(params.slotsPerRow / 2) + 1, 4), 16);
+        let bottom = horizontalRowCentersWithGateGap(bottomSlots, 4.8, "bottom", angle, 2.45, bounds, params, 2.3);
+        let right = verticalRowCentersWithGateGap(rightSlots, params.w / 2 - 4.0, "right", angle, 2.2, -4.7, bounds, params, 2.2);
+        if (params.terrainType === "customNotches") {
+          bottom.centers = filterCentersByTerrain(bottom.centers, 2.3, 5.0, terrain);
+          right.centers = filterCentersByTerrain(right.centers, 2.2, 5.0, terrain);
+        }
+        right.centers = filterVerticalAgainstHorizontalArms(right.centers, 2.2, 5.0, bottom.centers, 2.3, 5.0);
+        add(bottom.centers, 2.3, 5.0);
+        add(right.centers, 2.2, 5.0);
+      } else {
+        const sideSlots = Math.min(Math.max(params.slotsPerRow, 4), 16);
+        const topSlots = Math.min(Math.max(params.slotsPerRow - 1, 4), 16);
+        let left = verticalRowCentersWithGateGap(sideSlots, -params.w / 2 + 4.0, "left", angle, 2.0, -5.0, bounds, params, 2.2);
+        let right = verticalRowCentersWithGateGap(sideSlots, params.w / 2 - 4.0, "right", angle, 2.0, -5.0, bounds, params, 2.2);
+        let top = horizontalRowCentersWithGateGap(topSlots, -params.h / 2 + 4.6, "top", angle, 2.25, bounds, params, 2.2);
+        if (params.terrainType === "customNotches") {
+          left.centers = filterCentersByTerrain(left.centers, 2.2, 5.0, terrain);
+          right.centers = filterCentersByTerrain(right.centers, 2.2, 5.0, terrain);
+          top.centers = filterCentersByTerrain(top.centers, 2.2, 5.0, terrain);
+        }
+        left.centers = filterVerticalAgainstHorizontalArms(left.centers, 2.2, 5.0, top.centers, 2.2, 5.0);
+        right.centers = filterVerticalAgainstHorizontalArms(right.centers, 2.2, 5.0, top.centers, 2.2, 5.0);
+        add(left.centers, 2.2, 5.0);
+        add(right.centers, 2.2, 5.0);
+        add(top.centers, 2.2, 5.0);
+      }
+      return out;
+    }
+
+    function findClearLampSpot(x0, z0, bounds, slots, params) {
+      const margin = 0.55;
+      const edgePad = 0.45;
+      const offsets = [
+        [0, 0],
+        [1.4, 0],
+        [-1.4, 0],
+        [0, 1.4],
+        [0, -1.4],
+        [2.4, 0],
+        [-2.4, 0],
+        [0, 2.4],
+        [0, -2.4],
+        [1.8, 1.8],
+        [-1.8, 1.8],
+        [1.8, -1.8],
+        [-1.8, -1.8],
+        [3.2, 0],
+        [-3.2, 0]
+      ];
+      for (const [ox, oz] of offsets) {
+        const x = x0 + ox;
+        const z = z0 + oz;
+        if (x < bounds.minX + edgePad || x > bounds.maxX - edgePad || z < bounds.minZ + edgePad || z > bounds.maxZ - edgePad) {
+          continue;
+        }
+        if (!lampPositionInvalid(x, z, slots, margin, params, bounds)) {
+          return [x, z];
+        }
+      }
+      return null;
+    }
+
+    function addSharedDecor(params, terrain, bounds, gateAnchors) {
+      placeTreesByPosition(params, terrain, bounds);
+      placeObstacleZoneByPosition(params, terrain, bounds);
+
+      addGateApproachLanes(params, bounds);
+
+      createGatekeeperStation(gateAnchors[params.entrySide], params.entrySide, 0x2563eb);
+      if (params.gateMode === "separate") {
+        createGatekeeperStation(gateAnchors[params.exitSide], params.exitSide, 0x16a34a);
+      }
+
+      placeLampsArchitectural(bounds, params, terrain);
+    }
+
+    function placeLampsArchitectural(bounds, params, terrain) {
+      const slots = collectSlotCentersForLamps(params, bounds, terrain);
+      const pad = 3.2;
+      const cx = (bounds.minX + bounds.maxX) / 2;
+      const candidates = [
+        [bounds.minX + pad, bounds.minZ + pad],
+        [bounds.maxX - pad, bounds.minZ + pad],
+        [bounds.minX + pad, bounds.maxZ - pad],
+        [bounds.maxX - pad, bounds.maxZ - pad],
+        [cx, bounds.minZ + pad],
+        [cx, bounds.maxZ - pad]
+      ];
+      for (const [x0, z0] of candidates) {
+        const spot = findClearLampSpot(x0, z0, bounds, slots, params);
+        if (spot) {
+          createLamp(spot[0], spot[1]);
+        }
+      }
+    }
+
+    function buildRectangle(params, terrain, bounds, gateAnchors) {
+      let top = horizontalRowCentersWithGateGap(params.slotsPerRow, -6.2, "top", params.angle, 2.7, bounds, params, 2.4);
+      let bottom = horizontalRowCentersWithGateGap(params.slotsPerRow, 6.2, "bottom", params.angle, 2.7, bounds, params, 2.4);
+
+      if (params.terrainType === "customNotches") {
+        top.centers = filterCentersByTerrain(top.centers, 2.4, 5.0, terrain);
+        bottom.centers = filterCentersByTerrain(bottom.centers, 2.4, 5.0, terrain);
+      }
+
+      drawRowBoxes(top.centers, 2.4, 5.0);
+      drawRowBoxes(bottom.centers, 2.4, 5.0);
+
+      const disabledIndex = params.disabledArea === "yes" ? 0 : -1;
+      placeCarsFromCenters(top.centers, 0, disabledIndex);
+      placeCarsFromCenters(bottom.centers, 1);
+
+      if (params.disabledArea === "yes" && top.centers.length > 0) {
+        createDisabledMark(top.centers[0].x, top.centers[0].z, getAngleRotation(params.angle));
+      }
+
+      addSharedDecor(params, terrain, bounds, gateAnchors);
+      createArrow(0, -2.2, 0);
+      createArrow(0, 2.2, Math.PI);
+    }
+
+    function buildCenteredRectangle(params, terrain, bounds, gateAnchors) {
+      const innerSlots = Math.min(Math.max(params.slotsPerRow, 4), 16);
+      let top = horizontalRowCentersWithGateGap(innerSlots, -2.8, "top", params.angle, 2.45, bounds, params, 2.3);
+      let bottom = horizontalRowCentersWithGateGap(innerSlots, 2.8, "bottom", params.angle, 2.45, bounds, params, 2.3);
+
+      if (params.terrainType === "customNotches") {
+        top.centers = filterCentersByTerrain(top.centers, 2.3, 5.0, terrain);
+        bottom.centers = filterCentersByTerrain(bottom.centers, 2.3, 5.0, terrain);
+      }
+
+      drawRowBoxes(top.centers, 2.3, 5.0);
+      drawRowBoxes(bottom.centers, 2.3, 5.0);
+
+      const disabledIndex = params.disabledArea === "yes" ? 0 : -1;
+      placeCarsFromCenters(top.centers, 0, disabledIndex);
+      placeCarsFromCenters(bottom.centers, 1);
+
+      if (params.disabledArea === "yes" && top.centers.length > 0) {
+        createDisabledMark(top.centers[0].x, top.centers[0].z, getAngleRotation(params.angle));
+      }
+
+      addSharedDecor(params, terrain, bounds, gateAnchors);
+      createArrow(0, -5.6, 0);
+      createArrow(0, 5.6, Math.PI);
+    }
+
+    function buildLShape(params, terrain, bounds, gateAnchors) {
+      const bottomSlots = Math.min(Math.max(params.slotsPerRow, 5), 16);
+      let bottom = horizontalRowCentersWithGateGap(bottomSlots, 4.8, "bottom", params.angle, 2.45, bounds, params, 2.3);
+
+      const rightSlots = Math.min(
+        Math.max(Math.floor(params.slotsPerRow / 2) + 1, 4),
+        16
+      );
+      let right = verticalRowCentersWithGateGap(rightSlots, params.w/2 - 4.0, "right", params.angle, 2.2, -4.7, bounds, params, 2.2);
+
+      if (params.terrainType === "customNotches") {
+        bottom.centers = filterCentersByTerrain(bottom.centers, 2.3, 5.0, terrain);
+        right.centers = filterCentersByTerrain(right.centers, 2.2, 5.0, terrain);
+      }
+
+      right.centers = filterVerticalAgainstHorizontalArms(right.centers, 2.2, 5.0, bottom.centers, 2.3, 5.0);
+
+      drawRowBoxes(bottom.centers, 2.3, 5.0);
+      drawRowBoxes(right.centers, 2.2, 5.0);
+
+      const disabledIndex = params.disabledArea === "yes" ? 0 : -1;
+      placeCarsFromCenters(bottom.centers, 0, disabledIndex);
+      placeCarsFromCenters(right.centers, 1);
+
+      if (params.disabledArea === "yes" && bottom.centers.length > 0) {
+        createDisabledMark(bottom.centers[0].x, bottom.centers[0].z, Math.PI + getAngleRotation(params.angle));
+      }
+
+      addSharedDecor(params, terrain, bounds, gateAnchors);
+      createArrow(-2, 0, 0);
+    }
+
+    function buildUShape(params, terrain, bounds, gateAnchors) {
+      const sideSlots = Math.min(Math.max(params.slotsPerRow, 4), 16);
+      let left = verticalRowCentersWithGateGap(sideSlots, -params.w/2 + 4.0, "left", params.angle, 2.0, -5.0, bounds, params, 2.2);
+      let right = verticalRowCentersWithGateGap(sideSlots, params.w/2 - 4.0, "right", params.angle, 2.0, -5.0, bounds, params, 2.2);
+
+      const topSlots = Math.min(Math.max(params.slotsPerRow - 1, 4), 16);
+      let top = horizontalRowCentersWithGateGap(topSlots, -params.h/2 + 4.6, "top", params.angle, 2.25, bounds, params, 2.2);
+
+      if (params.terrainType === "customNotches") {
+        left.centers = filterCentersByTerrain(left.centers, 2.2, 5.0, terrain);
+        right.centers = filterCentersByTerrain(right.centers, 2.2, 5.0, terrain);
+        top.centers = filterCentersByTerrain(top.centers, 2.2, 5.0, terrain);
+      }
+
+      left.centers = filterVerticalAgainstHorizontalArms(left.centers, 2.2, 5.0, top.centers, 2.2, 5.0);
+      right.centers = filterVerticalAgainstHorizontalArms(right.centers, 2.2, 5.0, top.centers, 2.2, 5.0);
+
+      drawRowBoxes(left.centers, 2.2, 5.0);
+      drawRowBoxes(right.centers, 2.2, 5.0);
+      drawRowBoxes(top.centers, 2.2, 5.0);
+
+      const disabledIndex = params.disabledArea === "yes" ? 0 : -1;
+      placeCarsFromCenters(left.centers, 0, disabledIndex);
+      placeCarsFromCenters(right.centers, 1);
+      placeCarsFromCenters(top.centers, 2);
+
+      if (params.disabledArea === "yes" && left.centers.length > 0) {
+        createDisabledMark(left.centers[0].x, left.centers[0].z, getVerticalAngleRotation(params.angle, "left"));
+      }
+
+      addSharedDecor(params, terrain, bounds, gateAnchors);
+      createArrow(0, -1.2, 0);
+      createArrow(0, 1.8, Math.PI);
+    }
+
+    function generateLayout() {
+      clearLayout();
+      const params = commonParams();
+
+      if (!validateLayout(params)) return;
+
+      const terrainData = createTerrain(params);
+
+      if (params.layoutType === "rectangle") {
+        buildRectangle(params, terrainData.terrain, terrainData.bounds, terrainData.gateAnchors);
+      } else if (params.layoutType === "centeredRectangle") {
+        buildCenteredRectangle(params, terrainData.terrain, terrainData.bounds, terrainData.gateAnchors);
+      } else if (params.layoutType === "lshape") {
+        buildLShape(params, terrainData.terrain, terrainData.bounds, terrainData.gateAnchors);
+      } else {
+        buildUShape(params, terrainData.terrain, terrainData.bounds, terrainData.gateAnchors);
+      }
+    }
+
+    function updateCustomNotchFields() {
+      const terrainType = document.getElementById("terrainType").value;
+      document.getElementById("customNotchesSection").classList.toggle("hidden", terrainType !== "customNotches");
+    }
+
+    document.getElementById("terrainType").addEventListener("change", updateCustomNotchFields);
+    document.getElementById("generateBtn").addEventListener("click", generateLayout);
+    document.getElementById("resetViewBtn").addEventListener("click", setDefaultView);
+    document.getElementById("topViewBtn").addEventListener("click", setTopView);
+    document.getElementById("addNotchBtn").addEventListener("click", addNotchCard);
+    document.getElementById("removeNotchBtn").addEventListener("click", removeNotchCard);
+    document.getElementById("notchGrid").addEventListener("change", (event) => {
+      if (event.target && event.target.id.includes("_side")) {
+        syncNotchCardsToState();
+        renderNotchCards();
+      }
+    });
+
+    renderNotchCards();
+    updateCustomNotchFields();
+    generateLayout();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener("resize", () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  </script>
+</body>
+</html>
