@@ -1,17 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifier } from '../context/NotifierContext';
 import Navbar from '../components/Navbar';
 import './Dashboard.css';
 import { formatEgp } from '../utils/formatEgp';
 
-import { API_BASE } from '../config/apiBase';
+import { API_BASE, safeFetchJson } from '../config/apiBase';
 
 const SLOT_STATES = { 0: 'Available', 1: 'Occupied', 2: 'Reserved' };
 
 const AdminDashboard = () => {
   const { user } = useAuth();
-  const [activeSection, setActiveSection] = useState('accounts');
+  const [activeSection, setActiveSection] = useState('analytics');
   const [accounts, setAccounts] = useState([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [slots, setSlots] = useState([]);
@@ -35,6 +35,39 @@ const AdminDashboard = () => {
     password: '',
     role: 'user'
   });
+
+  const [analytics, setAnalytics] = useState(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState('');
+
+  const loadAnalytics = useCallback(async () => {
+    setAnalyticsLoading(true);
+    setAnalyticsError('');
+    try {
+      const result = await safeFetchJson('/admin/analytics');
+      if (result.error) {
+        setAnalytics(null);
+        setAnalyticsError(result.error);
+        return;
+      }
+      const data = result.data;
+      if (data && data.ok && data.analytics) {
+        setAnalytics(data.analytics);
+      } else {
+        setAnalytics(null);
+        setAnalyticsError((data && data.error) || 'Failed to load analytics');
+      }
+    } catch (err) {
+      setAnalytics(null);
+      setAnalyticsError(err.message || 'Cannot reach server');
+    } finally {
+      setAnalyticsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeSection === 'analytics') loadAnalytics();
+  }, [activeSection, loadAnalytics]);
 
   useEffect(() => {
     if (activeSection === 'accounts') loadUsers();
@@ -291,24 +324,203 @@ const AdminDashboard = () => {
       <div className="dashboard-content">
         <div className="admin-tabs">
           <button
+            type="button"
+            className={`admin-tab ${activeSection === 'analytics' ? 'active' : ''}`}
+            onClick={() => setActiveSection('analytics')}
+          >
+            Analytics &amp; Dashboard
+          </button>
+          <button
+            type="button"
             className={`admin-tab ${activeSection === 'accounts' ? 'active' : ''}`}
             onClick={() => setActiveSection('accounts')}
           >
             Accounts
           </button>
           <button
+            type="button"
             className={`admin-tab ${activeSection === 'slots' ? 'active' : ''}`}
             onClick={() => setActiveSection('slots')}
           >
             Manage Slots
           </button>
           <button
+            type="button"
             className={`admin-tab ${activeSection === 'reservations' ? 'active' : ''}`}
             onClick={() => setActiveSection('reservations')}
           >
             Reservation History & Payments
           </button>
         </div>
+
+        {activeSection === 'analytics' && (
+          <div className="dashboard-section admin-analytics-wrap">
+            <div className="admin-analytics-header">
+              <h2>Analytics &amp; Dashboard</h2>
+              <button type="button" className="btn btn-secondary btn-sm" onClick={loadAnalytics} disabled={analyticsLoading}>
+                {analyticsLoading ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+            <p className="parking-overview-hint admin-analytics-intro">
+              Booking counts, peak demand hours (by scheduled start time), most-booked spots, and live lot usage.
+            </p>
+
+            {analyticsLoading && !analytics ? (
+              <p className="empty-state">Loading analytics…</p>
+            ) : analyticsError ? (
+              <p className="empty-state slots-error">{analyticsError}</p>
+            ) : analytics ? (
+              <>
+                <div className="stats-container admin-analytics-kpis">
+                  <div className="stat-card">
+                    <h3>Total bookings</h3>
+                    <p className="stat-value">{analytics.totalBookings}</p>
+                    <p className="admin-analytics-kpi-sub">All-time reservation records</p>
+                  </div>
+                  <div className="stat-card">
+                    <h3>Last 7 days</h3>
+                    <p className="stat-value">{analytics.bookingsLast7Days}</p>
+                    <p className="admin-analytics-kpi-sub">New bookings created</p>
+                  </div>
+                  <div className="stat-card">
+                    <h3>Last 30 days</h3>
+                    <p className="stat-value">{analytics.bookingsLast30Days}</p>
+                    <p className="admin-analytics-kpi-sub">New bookings created</p>
+                  </div>
+                  <div className="stat-card">
+                    <h3>Avg. stay (completed)</h3>
+                    <p className="stat-value">
+                      {analytics.avgBookingDurationHours != null
+                        ? `${analytics.avgBookingDurationHours} h`
+                        : '—'}
+                    </p>
+                    <p className="admin-analytics-kpi-sub">Closed bookings only</p>
+                  </div>
+                  <div className="stat-card">
+                    <h3>Revenue (closed)</h3>
+                    <p className="stat-value">{formatEgp(analytics.totalRevenueClosed || 0)}</p>
+                    <p className="admin-analytics-kpi-sub">Sum of recorded totals</p>
+                  </div>
+                </div>
+
+                <div className="admin-analytics-two-col">
+                  <div className="admin-analytics-panel">
+                    <h3 className="admin-analytics-panel-title">Parking usage (live)</h3>
+                    <div className="admin-usage-grid">
+                      <div>
+                        <span className="admin-usage-label">Total spots</span>
+                        <strong className="admin-usage-num">{analytics.parkingSlots.total}</strong>
+                      </div>
+                      <div>
+                        <span className="admin-usage-label">Occupied</span>
+                        <strong className="admin-usage-num admin-usage-occupied">{analytics.parkingSlots.occupied}</strong>
+                      </div>
+                      <div>
+                        <span className="admin-usage-label">Available</span>
+                        <strong className="admin-usage-num admin-usage-available">{analytics.parkingSlots.available}</strong>
+                      </div>
+                      <div>
+                        <span className="admin-usage-label">Reserved</span>
+                        <strong className="admin-usage-num">{analytics.parkingSlots.reserved}</strong>
+                      </div>
+                      <div className="admin-usage-span">
+                        <span className="admin-usage-label">Occupancy rate</span>
+                        <strong className="admin-usage-num">{analytics.parkingSlots.utilizationPercent}%</strong>
+                        <span className="admin-usage-hint">Share of spots currently occupied</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="admin-analytics-panel">
+                    <h3 className="admin-analytics-panel-title">Bookings by status</h3>
+                    <ul className="admin-status-list">
+                      {Object.entries(analytics.bookingsByStatus || {}).length === 0 ? (
+                        <li className="admin-status-empty">No data</li>
+                      ) : (
+                        Object.entries(analytics.bookingsByStatus)
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([status, count]) => (
+                            <li key={status}>
+                              <span className={`status-badge status-${status}`}>{status}</span>
+                              <span className="admin-status-count">{count}</span>
+                            </li>
+                          ))
+                      )}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="admin-analytics-panel admin-analytics-panel--wide">
+                  <h3 className="admin-analytics-panel-title">Peak hours</h3>
+                  <p className="admin-analytics-panel-hint">
+                    Bookings by hour of <strong>scheduled start</strong> (24h clock, server timezone).
+                  </p>
+                  {(() => {
+                    const peak = analytics.peakHours || [];
+                    const maxC = Math.max(1, ...peak.map((p) => p.count));
+                    return (
+                      <div className="peak-hours-chart">
+                        {peak.map(({ hour, count }) => (
+                          <div key={hour} className="peak-hour-row">
+                            <span className="peak-hour-label">
+                              {String(hour).padStart(2, '0')}:00
+                            </span>
+                            <div className="peak-hour-bar-wrap">
+                              <div
+                                className="peak-hour-bar"
+                                style={{ width: `${(count / maxC) * 100}%` }}
+                              />
+                            </div>
+                            <span className="peak-hour-count">{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                  {analytics.peakHourTop5 && analytics.peakHourTop5.length > 0 && (
+                    <p className="admin-peak-top">
+                      <strong>Busiest hours:</strong>{' '}
+                      {analytics.peakHourTop5
+                        .map((p) => `${String(p.hour).padStart(2, '0')}:00 (${p.count})`)
+                        .join(' · ')}
+                    </p>
+                  )}
+                </div>
+
+                <div className="admin-analytics-panel">
+                  <h3 className="admin-analytics-panel-title">Most used spots</h3>
+                  <p className="admin-analytics-panel-hint">Ranked by number of bookings (all time).</p>
+                  <div className="table-container admin-analytics-table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>#</th>
+                          <th>Spot</th>
+                          <th>Bookings</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(analytics.mostUsedSpots || []).length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="empty-state">No bookings yet</td>
+                          </tr>
+                        ) : (
+                          analytics.mostUsedSpots.map((row, idx) => (
+                            <tr key={row.slot_no}>
+                              <td>{idx + 1}</td>
+                              <td><strong>{row.slot_no}</strong></td>
+                              <td>{row.booking_count}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </div>
+        )}
 
         {activeSection === 'accounts' && (
           <>

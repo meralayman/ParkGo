@@ -507,6 +507,102 @@ app.get("/admin/reservations", async (req, res) => {
   }
 });
 
+/** Aggregated booking analytics: counts, peak hours, popular spots, usage. */
+app.get("/admin/analytics", async (req, res) => {
+  try {
+    const totalR = await pool.query("SELECT COUNT(*)::int AS c FROM reservations");
+    const totalBookings = totalR.rows[0].c;
+
+    const byStatusR = await pool.query(
+      `SELECT status, COUNT(*)::int AS c FROM reservations GROUP BY status`
+    );
+    const bookingsByStatus = {};
+    for (const row of byStatusR.rows) {
+      bookingsByStatus[row.status] = row.c;
+    }
+
+    const peakR = await pool.query(
+      `SELECT EXTRACT(HOUR FROM start_time)::int AS hour, COUNT(*)::int AS cnt
+       FROM reservations
+       GROUP BY EXTRACT(HOUR FROM start_time)
+       ORDER BY hour ASC`
+    );
+    const hourMap = new Map(peakR.rows.map((r) => [Number(r.hour), r.cnt]));
+    const peakHours = [];
+    for (let h = 0; h < 24; h++) {
+      peakHours.push({ hour: h, count: hourMap.get(h) || 0 });
+    }
+    const peakHoursSorted = [...peakHours].sort((a, b) => b.count - a.count);
+
+    const topSlotsR = await pool.query(
+      `SELECT slot_no, COUNT(*)::int AS booking_count
+       FROM reservations
+       GROUP BY slot_no
+       ORDER BY booking_count DESC
+       LIMIT 20`
+    );
+
+    const slotsR = await pool.query("SELECT state FROM parking_slots");
+    const totalSlots = slotsR.rowCount;
+    let occupied = 0;
+    let available = 0;
+    let reserved = 0;
+    for (const s of slotsR.rows) {
+      const st = Number(s.state);
+      if (st === 1) occupied += 1;
+      else if (st === 2) reserved += 1;
+      else available += 1;
+    }
+
+    const durationR = await pool.query(
+      `SELECT AVG(EXTRACT(EPOCH FROM (end_time - start_time)) / 3600.0)::float AS avg_hours
+       FROM reservations
+       WHERE status = 'closed' AND end_time IS NOT NULL AND start_time IS NOT NULL`
+    );
+    const avgBookingDurationHours = durationR.rows[0].avg_hours;
+
+    const last7R = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM reservations WHERE created_at >= NOW() - INTERVAL '7 days'`
+    );
+    const last30R = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM reservations WHERE created_at >= NOW() - INTERVAL '30 days'`
+    );
+
+    const revenueR = await pool.query(
+      `SELECT COALESCE(SUM(total_amount), 0)::float AS total
+       FROM reservations WHERE status = 'closed' AND total_amount IS NOT NULL`
+    );
+
+    const utilizationPercent =
+      totalSlots > 0 ? Math.round((occupied / totalSlots) * 1000) / 10 : 0;
+
+    res.json({
+      ok: true,
+      analytics: {
+        totalBookings,
+        bookingsByStatus,
+        peakHours,
+        peakHourTop5: peakHoursSorted.slice(0, 5).filter((x) => x.count > 0),
+        mostUsedSpots: topSlotsR.rows,
+        parkingSlots: {
+          total: totalSlots,
+          occupied,
+          available,
+          reserved,
+          utilizationPercent,
+        },
+        avgBookingDurationHours:
+          avgBookingDurationHours != null ? Math.round(avgBookingDurationHours * 100) / 100 : null,
+        bookingsLast7Days: last7R.rows[0].c,
+        bookingsLast30Days: last30R.rows[0].c,
+        totalRevenueClosed: revenueR.rows[0].total,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: apiError(err) });
+  }
+});
+
 /* -------------------- ADMIN: add slot -------------------- */
 app.post("/admin/slots", async (req, res) => {
   try {

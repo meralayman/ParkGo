@@ -886,3 +886,209 @@
   border-color: var(--logo-blue);
   box-shadow: 0 0 0 3px var(--glow-blue);
 }
+
+/* —— Admin Analytics —— */
+.admin-analytics-wrap {
+  margin-bottom: 1.5rem;
+}
+
+.admin-analytics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.admin-analytics-header h2 {
+  margin: 0;
+}
+
+.admin-analytics-intro {
+  margin-bottom: 1.25rem !important;
+}
+
+.admin-analytics-kpis .stat-value {
+  font-size: 28px;
+}
+
+.admin-analytics-kpi-sub {
+  margin: 8px 0 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.admin-analytics-two-col {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+@media (min-width: 900px) {
+  .admin-analytics-two-col {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.admin-analytics-panel {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.25rem 1.35rem;
+}
+
+.admin-analytics-panel--wide {
+  margin-bottom: 1.5rem;
+}
+
+.admin-analytics-panel-title {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.admin-analytics-panel-hint {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.admin-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+@media (min-width: 480px) {
+  .admin-usage-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.admin-usage-span {
+  grid-column: 1 / -1;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.admin-usage-label {
+  display: block;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.admin-usage-num {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-usage-occupied {
+  color: #f87171;
+}
+
+.admin-usage-available {
+  color: #6ee7b7;
+}
+
+.admin-usage-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.admin-status-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-status-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-status-count {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-status-empty {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.peak-hours-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.peak-hour-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 36px;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.peak-hour-label {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.peak-hour-bar-wrap {
+  height: 10px;
+  background: rgba(148, 163, 184, 0.12);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.peak-hour-bar {
+  height: 100%;
+  min-width: 2px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--logo-blue), var(--logo-blue-light));
+  transition: width 0.25s ease;
+}
+
+.peak-hour-count {
+  text-align: right;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-peak-top {
+  margin: 1rem 0 0 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.admin-peak-top strong {
+  color: var(--text-primary);
+}
+
+.admin-analytics-table-wrap {
+  margin-top: 0.5rem;
+}

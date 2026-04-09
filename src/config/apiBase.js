@@ -29,3 +29,54 @@ export function apiUnreachableMessage() {
 export function apiBaseForErrors() {
   return API_BASE || 'http://127.0.0.1:5000 (dev proxy)';
 }
+
+/**
+ * Fetch and parse JSON safely. Avoids "Unexpected token '<'" when the server returns HTML
+ * (SPA index.html, Express 404 page, or proxy error page).
+ * @param {string} pathname e.g. '/admin/analytics'
+ */
+export async function safeFetchJson(pathname) {
+  const path = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  const url = `${API_BASE}${path}`;
+  let res;
+  try {
+    res = await fetch(url);
+  } catch (e) {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      error: `${apiUnreachableMessage()} (${e.message || 'network error'})`,
+    };
+  }
+  const text = await res.text();
+  if (!text || !text.trim()) {
+    return {
+      ok: false,
+      status: res.status,
+      data: null,
+      error: `Empty response from API (${res.status}). ${apiUnreachableMessage()}`,
+    };
+  }
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith('<!DOCTYPE') || trimmed.startsWith('<html') || trimmed.startsWith('<')) {
+    return {
+      ok: false,
+      status: res.status,
+      data: null,
+      error:
+        'The server returned a webpage instead of JSON. Usually this means the ParkGo backend is not running, is an old version without this API route, or the app is not pointed at the API. Start the backend (port 5000), restart it after updating, or set REACT_APP_API_BASE_URL in the frontend .env to your API base URL.',
+    };
+  }
+  try {
+    const data = JSON.parse(text);
+    return { ok: res.ok, status: res.status, data, error: null };
+  } catch (e) {
+    return {
+      ok: false,
+      status: res.status,
+      data: null,
+      error: `Invalid JSON from API (${res.status}). ${e.message || 'parse error'}`,
+    };
+  }
+}
