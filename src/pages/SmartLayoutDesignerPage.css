@@ -7,6 +7,23 @@
   background: var(--bg-dark, #0f1419);
 }
 
+.smart-layout-toolbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 20, 25, 0.95);
+}
+
+.smart-layout-home-link {
+  text-decoration: none;
+}
+
+.smart-layout-home-link:hover {
+  color: #fff;
+}
+
 .smart-layout-embed-main {
   flex: 1;
   min-height: 0;
