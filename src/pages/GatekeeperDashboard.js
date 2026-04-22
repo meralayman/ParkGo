@@ -63,7 +63,7 @@ const GatekeeperDashboard = () => {
       const data = await res.json();
 
       if (!data.ok) {
-        setStatusMsg(`❌ ${data.error || "Invalid booking"}`);
+        setStatusMsg(data.error || "Invalid booking");
         setLoading(false);
         return;
       }
@@ -73,13 +73,13 @@ const GatekeeperDashboard = () => {
       setNextAction(data.nextAction);
       setStatusMsg(
         data.nextAction === "check-in"
-          ? "✅ Booking confirmed — you can check in (entry)."
+          ? "Booking confirmed — you can check in (entry)."
           : data.nextAction === "check-out"
-            ? "✅ Customer checked in — you can check out (exit)."
-            : "✅ Loaded booking."
+            ? "Customer checked in — you can check out (exit)."
+            : "Loaded booking."
       );
     } catch (e) {
-      setStatusMsg(`❌ ${e.message || "Cannot reach server"}`);
+      setStatusMsg(e.message || "Cannot reach server");
     } finally {
       setLoading(false);
     }
@@ -101,16 +101,16 @@ const GatekeeperDashboard = () => {
       });
       const data = await res.json();
       if (!data.ok) {
-        setStatusMsg(`❌ ${data.error || "Check-in failed"}`);
+        setStatusMsg(data.error || "Check-in failed");
         setLoading(false);
         return;
       }
-      setStatusMsg(`✅ ${data.message} (slot ${data.slotNo})`);
+      setStatusMsg(`${data.message} (slot ${data.slotNo})`);
       setReservation(null);
       setNextAction(null);
       setToken("");
     } catch (e) {
-      setStatusMsg(`❌ ${e.message || "Cannot reach server"}`);
+      setStatusMsg(e.message || "Cannot reach server");
     } finally {
       setLoading(false);
     }
@@ -130,18 +130,18 @@ const GatekeeperDashboard = () => {
       });
       const data = await res.json();
       if (!data.ok) {
-        setStatusMsg(`❌ ${data.error || "Check-out failed"}`);
+        setStatusMsg(data.error || "Check-out failed");
         setLoading(false);
         return;
       }
       setStatusMsg(
-        `✅ ${data.message} (slot ${data.slotNo}) — total ${formatEgp(data.totalAmount)}`
+        `${data.message} (slot ${data.slotNo}) — total ${formatEgp(data.totalAmount)}`
       );
       setReservation(null);
       setNextAction(null);
       setToken("");
     } catch (e) {
-      setStatusMsg(`❌ ${e.message || "Cannot reach server"}`);
+      setStatusMsg(e.message || "Cannot reach server");
     } finally {
       setLoading(false);
     }

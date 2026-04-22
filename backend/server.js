@@ -46,6 +46,70 @@ try {
   console.warn("Paymob routes not loaded:", e?.message || e);
 }
 
+/** Flask ML demand service (train_model `app.py`). Default port 5001 — keep Express PORT separate. */
+const DEMAND_ML_URL = (
+  process.env.FLASK_DEMAND_URL ||
+  process.env.DEMAND_ML_URL ||
+  "http://127.0.0.1:5001"
+).replace(/\/$/, "");
+
+app.post("/api/predict-demand", async (req, res) => {
+  try {
+    const upstream = await fetch(`${DEMAND_ML_URL}/predict`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(req.body ?? {}),
+    });
+    const data = await upstream.json();
+    res.status(upstream.status).json(data);
+  } catch (err) {
+    console.error("[ParkGo] /api/predict-demand → Flask:", err?.message || err);
+    res.status(503).json({
+      ok: false,
+      error: "Demand prediction service unavailable. Start the Flask app (app.py).",
+    });
+  }
+});
+
+app.get("/api/forecast", async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const url = qs ? `${DEMAND_ML_URL}/forecast?${qs}` : `${DEMAND_ML_URL}/forecast`;
+    const upstream = await fetch(url, { headers: { Accept: "application/json" } });
+    const text = await upstream.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      console.error("[ParkGo] /api/forecast: ML service returned non-JSON from", url);
+      return res.status(503).json({
+        ok: false,
+        error:
+          "Demand forecast response was not JSON. Check that Flask (app.py) is running on " +
+          DEMAND_ML_URL +
+          " and exposes GET /forecast.",
+      });
+    }
+    if (!upstream.ok) {
+      if (upstream.status === 404) {
+        return res.status(503).json({
+          ok: false,
+          error:
+            `No forecast route at ${url}. Verify FLASK_DEMAND_URL / DEMAND_ML_URL and that ParkGo app.py is running (GET /forecast).`,
+        });
+      }
+      return res.status(upstream.status).json(data);
+    }
+    return res.status(200).json(data);
+  } catch (err) {
+    console.error("[ParkGo] /api/forecast → Flask:", err?.message || err);
+    res.status(503).json({
+      ok: false,
+      error: "Demand forecast service unavailable. Start the Flask app (app.py).",
+    });
+  }
+});
+
 /** EGP per hour — new bookings and voluntary “add 1 hour” */
 const PARKING_HOURLY_RATE = Number(process.env.PARKING_HOURLY_RATE) || 5;
 /** EGP per hour for staying past end_time without extending — charged at gate checkout (per full hour, rounded up). Defaults to PARKING_HOURLY_RATE. */
@@ -108,6 +172,60 @@ async function runSweepNoShows() {
   }
 }
 
+/**
+ * Align `reservations.status` CHECK with server.js (confirmed | checked_in | closed | cancelled | no_show).
+ * Older DBs often still constrain e.g. active/pending/completed, which makes INSERT ... 'confirmed' fail.
+ */
+async function ensureReservationsStatusConstraint() {
+  const client = await pool.connect();
+  try {
+    const ex = await client.query(`
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'reservations'
+    `);
+    if (ex.rowCount === 0) return;
+
+    await client.query("BEGIN");
+    await client.query(`ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_status_check`);
+    await client.query(
+      `UPDATE reservations SET status = 'confirmed' WHERE LOWER(TRIM(status)) IN ('active', 'pending')`
+    );
+    await client.query(
+      `UPDATE reservations SET status = 'closed' WHERE LOWER(TRIM(status)) IN ('completed', 'used')`
+    );
+    await client.query(
+      `UPDATE reservations SET status = 'checked_in' WHERE LOWER(TRIM(status)) IN ('check_in', 'checked-in')`
+    );
+    await client.query(
+      `UPDATE reservations SET status = 'cancelled' WHERE LOWER(TRIM(status)) IN ('expired', 'canceled')`
+    );
+    await client.query(`
+      UPDATE reservations SET status = 'confirmed'
+      WHERE status IS NULL
+         OR TRIM(status) = ''
+         OR LOWER(TRIM(status)) NOT IN ('confirmed', 'checked_in', 'closed', 'cancelled', 'no_show')
+    `);
+    await client.query(`
+      ALTER TABLE reservations ADD CONSTRAINT reservations_status_check
+      CHECK (status IN ('confirmed', 'checked_in', 'closed', 'cancelled', 'no_show'))
+    `);
+    await client.query("COMMIT");
+    console.log("[ParkGo] reservations.status CHECK constraint is aligned with the API.");
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      /* ignore */
+    }
+    console.warn(
+      "[ParkGo] Could not auto-align reservations_status_check. Run as DB owner: backend/scripts/init-db.sql (status block).",
+      err?.message || err
+    );
+  } finally {
+    client.release();
+  }
+}
+
 /** Hide raw PostgreSQL errors from API clients; log full error on the server. */
 function apiError(err) {
   const msg = err && err.message ? String(err.message) : "Something went wrong";
@@ -129,6 +247,10 @@ app.get("/", (req, res) => {
     message: "Backend is running. Use the frontend app to sign up or log in.",
     health: "/health",
     auth: { login: "POST /auth/login", signup: "POST /auth/signup" },
+    demandMl: {
+      predict: "POST /api/predict-demand → Flask /predict",
+      forecast: "GET /api/forecast → Flask /forecast",
+    },
   });
 });
 
@@ -1343,6 +1465,11 @@ const PORT = process.env.PORT || 5000;
 const MISSED_CHECKIN_SWEEP_MS = Number(process.env.MISSED_CHECKIN_SWEEP_MS) || 60_000;
 
 app.listen(PORT, async () => {
+  try {
+    await ensureReservationsStatusConstraint();
+  } catch (e) {
+    console.error("[ParkGo] reservations status constraint:", e?.message || e);
+  }
   try {
     await ensureIncidentReportsTable();
   } catch (e) {

@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useNotifier } from '../context/NotifierContext';
 import Navbar from '../components/Navbar';
+import DemandGuidanceBanner from '../components/DemandGuidanceBanner';
+import SmartParkingAssistant from '../components/SmartParkingAssistant';
+import ParkingRulesSection from '../components/ParkingRulesSection';
 import AlexandriaParkingGrid from '../components/AlexandriaParkingGrid';
 import { LOT_NAME } from '../constants/alexandriaLot';
 import { PARKGO_PENDING_SLOT_KEY } from '../constants/pendingSlot';
@@ -11,6 +14,7 @@ import './Dashboard.css';
 import { QRCodeCanvas } from "qrcode.react";
 
 import { API_BASE } from '../config/apiBase';
+import { fetchParkingDemandInsight } from '../utils/parkingDemandHint';
 import {
   CHECK_IN_DEADLINE_MINUTES,
   CHECK_IN_WARNING_LEAD_MINUTES,
@@ -48,6 +52,10 @@ const UserDashboard = () => {
   /** Slot chosen on the public map or here; kept in localStorage across login */
   const [pendingSlotNo, setPendingSlotNo] = useState(null);
 
+  /** Demand insight for reservation modal (High / Low banners) */
+  const [demandInsight, setDemandInsight] = useState(null);
+  const [demandInsightLoading, setDemandInsightLoading] = useState(false);
+
   const clearPendingSlot = () => {
     setPendingSlotNo(null);
     try {
@@ -84,6 +92,46 @@ const UserDashboard = () => {
       clearPendingSlot();
     }
   }, [slots, pendingSlotNo]);
+
+  /** Load demand prediction when date + time are set (booking modal). */
+  useEffect(() => {
+    if (!showReservationModal || !reservationData.date || !reservationData.time) {
+      setDemandInsight(null);
+      setDemandInsightLoading(false);
+      return;
+    }
+
+    const startTime = new Date(`${reservationData.date}T${reservationData.time}`);
+    if (Number.isNaN(startTime.getTime())) {
+      setDemandInsight(null);
+      return;
+    }
+
+    let cancelled = false;
+    setDemandInsightLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const insight = await fetchParkingDemandInsight(startTime);
+        if (cancelled) return;
+        if (insight) {
+          setDemandInsight(insight);
+        } else {
+          setDemandInsight(null);
+        }
+      } finally {
+        if (!cancelled) setDemandInsightLoading(false);
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [
+    showReservationModal,
+    reservationData.date,
+    reservationData.time,
+  ]);
 
   const loadSlots = async () => {
     setSlotsLoading(true);
@@ -366,7 +414,7 @@ const UserDashboard = () => {
 
   return (
     <div className="dashboard">
-      <Navbar />
+      <Navbar hideLotDesignerLink />
       <header className="dashboard-header">
         <div>
           <h1>User Dashboard</h1>
@@ -440,6 +488,8 @@ const UserDashboard = () => {
         </div>
 
         <div className="dashboard-sections">
+          <SmartParkingAssistant />
+
           <div className="dashboard-section parking-overview-dashboard">
             <h2>Parking Overview</h2>
             <p className="parking-overview-hint">
@@ -616,6 +666,8 @@ const UserDashboard = () => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2>Make a Reservation</h2>
 
+            <ParkingRulesSection variant="modal" />
+
             <form onSubmit={(e) => {
               e.preventDefault();
               handleCreateReservation();
@@ -702,6 +754,16 @@ const UserDashboard = () => {
                   />
                 </div>
               </div>
+
+              {demandInsightLoading && (
+                <p className="parkgo-demand-loading" role="status">
+                  Checking typical demand for this time…
+                </p>
+              )}
+
+              {!demandInsightLoading && demandInsight && (
+                <DemandGuidanceBanner insight={demandInsight} />
+              )}
 
               <div className="modal-actions">
                 <button type="submit" className="btn btn-primary">

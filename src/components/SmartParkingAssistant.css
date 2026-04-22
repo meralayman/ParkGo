@@ -1,0 +1,320 @@
+/* Smart Parking Assistant — dashboard dark theme */
+
+.smart-parking-assistant .smart-parking-assistant__header {
+  margin-bottom: 1.75rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.smart-parking-assistant .smart-parking-assistant__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.375rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.smart-parking-assistant .smart-parking-assistant__tagline {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--logo-blue-light);
+  font-weight: 500;
+}
+
+.smart-parking-assistant__block {
+  margin-top: 1.75rem;
+}
+
+.smart-parking-assistant__block:first-of-type {
+  margin-top: 0;
+}
+
+.smart-parking-assistant__heading {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.smart-parking-assistant__hint {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+/* Current demand spotlight — larger hero card */
+.smart-parking-assistant__current-wrap {
+  border-radius: var(--radius-xl);
+  padding: 1.5rem 1.65rem;
+  background: linear-gradient(
+    145deg,
+    rgba(37, 99, 235, 0.14),
+    rgba(15, 23, 42, 0.55)
+  );
+  border: 1px solid rgba(96, 165, 250, 0.35);
+}
+
+.smart-parking-assistant__current-wrap .spa-forecast-card--hero {
+  margin-top: 0;
+}
+
+.smart-parking-assistant__current-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 0.65rem;
+}
+
+.smart-parking-assistant .spa-forecast-trend {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text-primary);
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(96, 165, 250, 0.28);
+}
+
+/* Forecast strip */
+.smart-parking-assistant__forecast-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+}
+
+@media (min-width: 992px) {
+  .smart-parking-assistant__forecast-grid.spa-five-cols {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+.smart-parking-assistant .spa-forecast-card {
+  border-radius: var(--radius-md);
+  padding: 0.85rem 0.95rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+/* Current demand — enlarged card */
+.smart-parking-assistant .spa-forecast-card--hero {
+  padding: 1.35rem 1.45rem;
+  min-height: 8rem;
+}
+
+.smart-parking-assistant .spa-forecast-card--hero .spa-forecast-card__hour {
+  font-size: 1.65rem;
+  letter-spacing: -0.03em;
+}
+
+.smart-parking-assistant .spa-forecast-card--hero .spa-forecast-card__body {
+  font-size: 0.95rem;
+}
+
+.smart-parking-assistant .spa-forecast-card--hero .spa-forecast-card__reason {
+  font-size: 0.875rem;
+}
+
+.smart-parking-assistant .spa-forecast-card__lead {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.smart-parking-assistant .spa-forecast-card--hero-high {
+  border-color: rgba(239, 68, 68, 0.45);
+  box-shadow: 0 8px 28px rgba(239, 68, 68, 0.12);
+}
+
+.smart-parking-assistant .spa-forecast-card:hover {
+  border-color: rgba(96, 165, 250, 0.35);
+  box-shadow: var(--shadow-sm);
+}
+
+.smart-parking-assistant .spa-forecast-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.smart-parking-assistant .spa-forecast-card__hour {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.smart-parking-assistant .spa-forecast-card__offset {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.smart-parking-assistant .spa-forecast-card__body {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.smart-parking-assistant .spa-forecast-card__reason {
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.smart-parking-assistant .spa-forecast-card__reason strong {
+  display: block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 0.2rem;
+}
+
+.smart-parking-assistant .spa-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.smart-parking-assistant .spa-badge--green {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+}
+
+/* Medium — softer muted yellow */
+.smart-parking-assistant .spa-badge--yellow {
+  background: rgba(234, 179, 8, 0.14);
+  color: #ca8a04;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+}
+
+/* High — stronger red */
+.smart-parking-assistant .spa-badge--red {
+  background: rgba(220, 38, 38, 0.35);
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  box-shadow: 0 0 0 1px rgba(127, 29, 29, 0.35);
+}
+
+.smart-parking-assistant .spa-badge--muted {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-muted);
+}
+
+.smart-parking-assistant .spa-loading {
+  padding: 1.25rem;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.smart-parking-assistant .spa-alert {
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  font-size: 0.875rem;
+}
+
+/* Booking advice — advanced intro (replaces static hint) */
+.smart-parking-assistant .spa-booking-advice-intro {
+  position: relative;
+  display: flex;
+  margin-bottom: 1.25rem;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.95) 0%, rgba(15, 23, 42, 0.98) 100%);
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+}
+
+.smart-parking-assistant .spa-booking-advice-intro__accent {
+  width: 5px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, var(--logo-blue-light) 0%, var(--logo-blue) 50%, #6366f1 100%);
+}
+
+.smart-parking-assistant .spa-booking-advice-intro__inner {
+  flex: 1;
+  padding: 1rem 1.15rem 1.1rem 1rem;
+  min-width: 0;
+}
+
+.smart-parking-assistant .spa-booking-advice-intro__top {
+  margin-bottom: 0.55rem;
+}
+
+.smart-parking-assistant .spa-booking-advice-intro__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  text-transform: none;
+}
+
+.smart-parking-assistant .spa-booking-advice-intro__kicker {
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--logo-blue-light);
+}
+
+.smart-parking-assistant .spa-booking-advice-intro__live {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.smart-parking-assistant .spa-booking-advice-intro__live--pulse {
+  color: #cbd5e1;
+}
+
+@keyframes spa-booking-live-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.smart-parking-assistant .spa-booking-advice-intro__live--pulse {
+  animation: spa-booking-live-pulse 1.2s ease-in-out infinite;
+}
+
+/* Booking advice form */
+.smart-parking-assistant .spa-booking-row {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 575.98px) {
+  .smart-parking-assistant .spa-booking-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.smart-parking-assistant .spa-booking-row .form-group label {
+  font-size: 0.8125rem;
+}

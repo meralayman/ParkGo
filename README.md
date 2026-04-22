@@ -76,6 +76,20 @@ Keep both running. Use the frontend URL for login/signup.
 
 ---
 
+## Smart Parking Assistant (demand forecast)
+
+The dashboard calls **`/api/forecast`** on the **Node backend (port 5000)**. Express proxies to the **Flask** demand app (`app.py`, default **port 5001**).
+
+| Terminal | Command | Purpose |
+|----------|---------|---------|
+| (already) | `backend`: `npm start` | Express — must include `/api/forecast` |
+| **extra** | From project root: `python app.py` (or set `FLASK_DEMAND_PORT`) | Loads `demand_model.pkl` and serves `/forecast` |
+
+- **`REACT_APP_API_BASE_URL`** in the project root `.env` must be the **Express** URL, e.g. `http://127.0.0.1:5000`. Do **not** point it at Flask (`5001`) — that causes **404** on `/api/forecast` because Flask only exposes `/forecast`, not `/api/forecast`.
+- In **`npm start` (development)**, the Smart Parking forecast uses the **relative** URL `/api/forecast`, which CRA forwards to Express via `package.json` `"proxy"` — so forecast works even if `.env` still mentions port 5001 by mistake.
+
+---
+
 ## If something fails
 
 - **"permission denied for table users"**  
@@ -87,6 +101,9 @@ Keep both running. Use the frontend URL for login/signup.
 
 - **Frontend can’t reach API**  
   Ensure the backend is running on port 5000. The frontend is set to use `http://localhost:5000`.
+
+- **“Forecast unavailable (404)” on Smart Parking Assistant**  
+  Point `REACT_APP_API_BASE_URL` at **port 5000** (Express), not 5001. Start **Flask** (`python app.py`) so Express can proxy forecast requests.
 
 ---
 

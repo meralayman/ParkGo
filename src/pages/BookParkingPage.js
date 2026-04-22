@@ -12,8 +12,6 @@ const SIDE_CARDS = [
   },
 ];
 
-const BOTTOM_CARDS = [{ id: 'b1', title: LOT_NAME, locations: 0 }];
-
 const MAP_PINS = [{ id: 1, x: 50, y: 48 }];
 
 function IconGrad() {
@@ -91,16 +89,6 @@ const BookParkingPage = () => {
                 </Link>
               ))}
             </div>
-
-            <Link to="/lot-designer" className="book-parking-own-system">
-              <span className="book-parking-own-ico" aria-hidden>
-                ✨
-              </span>
-              <span>
-                <strong>Make your own system</strong>
-                <span className="book-parking-own-sub">Design a layout for your lot with AI or manual tools</span>
-              </span>
-            </Link>
           </aside>
 
           <section className="book-parking-map-section" aria-label="Map">
@@ -162,22 +150,6 @@ const BookParkingPage = () => {
             </div>
           </section>
         </div>
-
-        <section className="book-parking-bottom" aria-label="Browse by category">
-          <h2 className="visually-hidden">Location</h2>
-          <div className="book-parking-bottom-grid book-parking-bottom-grid--single">
-            {BOTTOM_CARDS.map((c) => (
-              <Link key={c.id} to={ALEXANDRIA_LOT_PATH} className="book-parking-bottom-card book-parking-bottom-card--link">
-                <IconGrad />
-                <div className="book-parking-bottom-text">
-                  <h3 className="book-parking-bottom-title">{c.title}</h3>
-                  <p className="book-parking-bottom-meta">{c.locations} locations available</p>
-                </div>
-                <span className="book-parking-select-btn">Select</span>
-              </Link>
-            ))}
-          </div>
-        </section>
       </main>
     </div>
   );

@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import './Navbar.css';
 
-const Navbar = ({ showAuthLinks = false, variant = 'default' }) => {
+const Navbar = ({ showAuthLinks = false, variant = 'default', hideLotDesignerLink = false }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -22,9 +22,11 @@ const Navbar = ({ showAuthLinks = false, variant = 'default' }) => {
 
   const navLinks = (
     <>
-      <Link to="/lot-designer" className="nav-link parkgo-nav-link" onClick={() => setMobileOpen(false)}>
-        Lot designer
-      </Link>
+      {!hideLotDesignerLink && (
+        <Link to="/lot-designer" className="nav-link parkgo-nav-link" onClick={() => setMobileOpen(false)}>
+          Lot designer
+        </Link>
+      )}
       {showAuthLinks && !user && (
         <>
           <Link to="/login" className="nav-link parkgo-nav-link" onClick={() => setMobileOpen(false)}>Login</Link>

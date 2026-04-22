@@ -1,0 +1,146 @@
+.parking-demand-forecast {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 1.25rem;
+}
+
+.parking-demand-forecast__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 1.25rem;
+  color: var(--parkgo-heading, #0f172a);
+}
+
+.parking-demand-forecast__subtitle {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--parkgo-muted, #64748b);
+  margin: 1.25rem 0 0.75rem;
+}
+
+.parking-demand-forecast__current {
+  border-radius: 14px;
+  padding: 1.25rem 1.35rem;
+  background: linear-gradient(
+    145deg,
+    rgba(37, 99, 235, 0.08),
+    rgba(15, 23, 42, 0.04)
+  );
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  margin-bottom: 1.5rem;
+}
+
+.parking-demand-forecast__current-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.parking-demand-forecast__grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.parking-demand-forecast__card {
+  border-radius: 12px;
+  padding: 1rem 1.1rem;
+  background: var(--parkgo-card-bg, #fff);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.parking-demand-forecast__card:hover {
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.09);
+}
+
+.parking-demand-forecast__card-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.parking-demand-forecast__hour-label {
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: #0f172a;
+}
+
+.parking-demand-forecast__offset {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.parking-demand-forecast__body {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.parking-demand-forecast__body-row {
+  margin-top: 0.45rem;
+}
+
+.parking-demand-forecast__body-row strong {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+  display: block;
+  margin-bottom: 0.15rem;
+}
+
+.parking-demand-forecast__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.parking-demand-forecast__badge--green {
+  background: rgba(34, 197, 94, 0.2);
+  color: #166534;
+}
+
+.parking-demand-forecast__badge--yellow {
+  background: rgba(234, 179, 8, 0.25);
+  color: #854d0e;
+}
+
+.parking-demand-forecast__badge--red {
+  background: rgba(239, 68, 68, 0.2);
+  color: #991b1b;
+}
+
+.parking-demand-forecast__badge--muted {
+  background: rgba(100, 116, 139, 0.25);
+  color: #475569;
+}
+
+.parking-demand-forecast__alert {
+  padding: 1rem;
+  border-radius: 10px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #991b1b;
+}
+
+.parking-demand-forecast__loading {
+  padding: 2rem;
+  text-align: center;
+  color: #64748b;
+}

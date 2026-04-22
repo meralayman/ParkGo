@@ -62,7 +62,7 @@ export const AuthProvider = ({ children }) => {
           phoneNumber: userData.phoneNumber,
           nationalId: userData.nationalId,
           username: userData.username,
-          email: userData.gmail, // ✅ your frontend field is gmail
+          email: userData.gmail, // frontend field is gmail
           password: userData.password,
           role: userData.role || "user",
         }),

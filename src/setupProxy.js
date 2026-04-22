@@ -7,6 +7,8 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 module.exports = function setupProxy(app) {
   const target = 'http://127.0.0.1:5000';
   const opts = { target, changeOrigin: true };
+  /** Ensures /api/* (e.g. /api/forecast) hits Express; package.json "proxy" alone can miss some paths. */
+  app.use('/api', createProxyMiddleware(opts));
   app.use('/incidents', createProxyMiddleware(opts));
   app.use('/uploads', createProxyMiddleware(opts));
 };

@@ -13,12 +13,67 @@ function getApiBase() {
     if (process.env.NODE_ENV === 'development' && /:(3000|3001)(\/|$)/.test(u)) {
       u = 'http://127.0.0.1:5000';
     }
+    // Demand ML (Flask) runs on 5001; browser calls must hit Express (5000) for /api/* routes (e.g. /api/forecast).
+    // Pointing REACT_APP_API_BASE_URL at :5001 causes GET /api/forecast → 404 on Flask.
+    if (/:(5001)(\/|$)/.test(u)) {
+      u = u.replace(/:5001(?=\/|$)/, ':5000');
+    }
     return u;
   }
   return 'http://127.0.0.1:5000';
 }
 
 export const API_BASE = getApiBase();
+
+/**
+ * GET /api/forecast — in development use a relative URL so Create React App's `proxy`
+ * forwards to Express (port 5000). A mis-set REACT_APP_API_BASE_URL (e.g. Flask on :5001)
+ * would otherwise call `/api/forecast` on the wrong server and return 404.
+ */
+export function apiForecastUrl() {
+  if (process.env.NODE_ENV === 'development') {
+    return '/api/forecast';
+  }
+  const base = String(API_BASE || '').replace(/\/$/, '');
+  return `${base}/api/forecast`;
+}
+
+/** Local Express (Node API) — same host as Smart Parking Assistant proxy target */
+const EXPRESS_FORECAST_FALLBACK = 'http://127.0.0.1:5000/api/forecast';
+
+/**
+ * GET /api/forecast as JSON array. Tries {@link apiForecastUrl} first, then Express :5000 directly
+ * so forecast still loads if the CRA proxy returns 404 or misroutes.
+ */
+export async function fetchForecastArray() {
+  const urls = [...new Set([apiForecastUrl(), EXPRESS_FORECAST_FALLBACK])];
+
+  let lastRes = /** @type {Response | null} */ (null);
+  let lastData = /** @type {unknown} */ (null);
+
+  for (const url of urls) {
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    const data = await res.json().catch(() => null);
+    if (res.ok && Array.isArray(data)) {
+      return data;
+    }
+    lastRes = res;
+    lastData = data;
+  }
+
+  let msg = `Demand forecast unavailable (HTTP ${lastRes?.status ?? '?'})`;
+  if (
+    lastData &&
+    typeof lastData === 'object' &&
+    typeof lastData.error === 'string'
+  ) {
+    msg = lastData.error;
+  }
+
+  const err = new Error(msg);
+  err.status = lastRes?.status;
+  throw err;
+}
 
 /**
  * Absolute URL for an API path. Use for multipart (FormData) POSTs so they always reach Express

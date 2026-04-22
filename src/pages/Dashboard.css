@@ -734,6 +734,129 @@
   font-size: 14px;
 }
 
+.parkgo-demand-loading {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+}
+
+.parkgo-demand-banner {
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 1.45;
+  border: 1px solid transparent;
+}
+
+.parkgo-demand-banner__copy {
+  margin: 0;
+}
+
+.parkgo-demand-banner__meta {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.parkgo-demand-banner--warning {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+.parkgo-demand-banner--success {
+  background: rgba(16, 185, 129, 0.14);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.parkgo-demand-banner--medium {
+  background: rgba(234, 179, 8, 0.12);
+  border-color: rgba(202, 138, 4, 0.38);
+}
+
+.parkgo-demand-banner__copy--with-lead {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+}
+
+.parkgo-demand-banner__level-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 0.35rem;
+  box-shadow: 0 0 0 2px rgba(15, 23, 42, 0.35);
+}
+
+.parkgo-demand-banner__level-dot--high {
+  background: #ef4444;
+}
+
+.parkgo-demand-banner__level-dot--medium {
+  background: #eab308;
+}
+
+.parkgo-demand-banner__level-dot--low {
+  background: #22c55e;
+}
+
+/* Rich guidance: action copy + bar + explainability */
+.parkgo-demand-banner--rich .parkgo-demand-banner__body-col {
+  flex: 1;
+  min-width: 0;
+}
+
+.parkgo-demand-banner__main {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-primary);
+}
+
+.parkgo-demand-banner__reason-context {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.parkgo-demand-bar {
+  margin-top: 10px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.2);
+  overflow: hidden;
+}
+
+.parkgo-demand-bar__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--logo-blue) 0%, var(--logo-blue-light) 100%);
+  transition: width 0.35s ease;
+}
+
+.parkgo-demand-banner--warning .parkgo-demand-bar__fill {
+  background: linear-gradient(90deg, #b91c1c 0%, #f97316 100%);
+}
+
+.parkgo-demand-banner--success .parkgo-demand-bar__fill {
+  background: linear-gradient(90deg, #047857 0%, #34d399 100%);
+}
+
+.parkgo-demand-banner--medium .parkgo-demand-bar__fill {
+  background: linear-gradient(90deg, #a16207 0%, #facc15 100%);
+}
+
+.parkgo-demand-banner__explain {
+  margin: 8px 0 0;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* Exit QR (cash) modal */
 .exit-qr-modal h2 {
   text-align: center;

@@ -1,0 +1,80 @@
+/* Tighten title spacing when rules sit directly under the modal heading */
+.modal-content:has(.parking-rules-modal-box) > h2 {
+  margin-bottom: 14px;
+}
+
+/* Make Reservation modal — high-contrast defined box */
+.parking-rules-modal-box {
+  display: flex;
+  align-items: stretch;
+  margin: 0 0 1.35rem 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 2px solid rgba(96, 165, 250, 0.85);
+  box-shadow:
+    0 0 0 1px rgba(15, 23, 42, 0.9),
+    0 6px 24px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  background: linear-gradient(160deg, rgba(15, 23, 42, 1) 0%, rgba(30, 41, 59, 0.98) 100%);
+}
+
+.parking-rules-modal-box__accent {
+  width: 6px;
+  flex-shrink: 0;
+  background: linear-gradient(180deg, #38bdf8 0%, #2563eb 45%, #6366f1 100%);
+}
+
+.parking-rules-modal-box__inner {
+  flex: 1;
+  padding: 1rem 1.2rem 1.1rem 1rem;
+  min-width: 0;
+}
+
+.parking-rules-modal-box__title {
+  margin: 0 0 0.7rem 0;
+  padding-bottom: 0.55rem;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #f1f5f9;
+  border-bottom: 2px solid rgba(96, 165, 250, 0.45);
+}
+
+.parking-rules-modal-box__list {
+  margin: 0;
+  padding-left: 1.3rem;
+  color: #e2e8f0;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  font-weight: 600;
+}
+
+.parking-rules-modal-box__list li {
+  margin-bottom: 0.45rem;
+}
+
+.parking-rules-modal-box__list li:last-child {
+  margin-bottom: 0;
+}
+
+/* User dashboard — matches .dashboard-section rhythm */
+.dashboard-content .parking-rules-section {
+  margin-bottom: 30px;
+}
+
+.parking-rules-section__list {
+  margin: 0;
+  padding-left: 1.35rem;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.parking-rules-section__list li {
+  margin-bottom: 0.45rem;
+}
+
+.parking-rules-section__list li:last-child {
+  margin-bottom: 0;
+}

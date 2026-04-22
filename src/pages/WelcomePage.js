@@ -70,7 +70,7 @@ const WelcomePage = () => {
 
   return (
     <div className="welcome-page">
-      <Navbar showAuthLinks />
+      <Navbar showAuthLinks hideLotDesignerLink />
       <main className="welcome-main">
         <section className="welcome-hero">
           <div className="welcome-hero-copy">
@@ -93,20 +93,24 @@ const WelcomePage = () => {
                 </span>
                 Book Parking
               </Link>
-              <Link to="/lot-designer" className="welcome-btn welcome-btn-secondary">
-                <span className="welcome-btn-ico" aria-hidden>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M4 6h6v6H4V6zm10 0h6v6h-6V6zM4 16h6v6H4v-6zm10 0h6v6h-6v-6z"
-                      stroke="currentColor"
-                      strokeWidth="1.5"
-                    />
-                  </svg>
-                </span>
-                Turn your space into parking
-              </Link>
+              <div className="welcome-owner-cta">
+                <Link to="/lot-designer" className="welcome-btn welcome-btn-secondary">
+                  <span className="welcome-btn-ico" aria-hidden>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path
+                        d="M4 6h6v6H4V6zm10 0h6v6h-6V6zM4 16h6v6H4v-6zm10 0h6v6h-6v-6z"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      />
+                    </svg>
+                  </span>
+                  Turn your space into parking
+                </Link>
+                <p className="welcome-caption welcome-caption--under-owner-cta">
+                  For parking owners &amp; businesses
+                </p>
+              </div>
             </div>
-            <p className="welcome-caption">For parking owners &amp; businesses</p>
           </div>
           <div className="welcome-hero-visual">
             <WelcomeHeroIllustration />
