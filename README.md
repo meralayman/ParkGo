@@ -63,6 +63,8 @@ npm start
 - App runs at **http://localhost:3001** (or 3000 if 3001 is busy)
 - Open that URL in the browser to use ParkGo
 
+**Book parking map:** `/book-parking` uses an interactive map (Leaflet) with **CARTO Voyager** tiles (OpenStreetMap data, English attribution). No API key is required; you need an internet connection to load map tiles.
+
 ---
 
 ## Summary – two terminals

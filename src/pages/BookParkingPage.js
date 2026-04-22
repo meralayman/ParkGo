@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import BookParkingMap from '../components/BookParkingMap';
 import { ALEXANDRIA_LOT_PATH, LOT_NAME } from '../constants/alexandriaLot';
 import './BookParkingPage.css';
 
@@ -11,8 +12,6 @@ const SIDE_CARDS = [
     locations: 0,
   },
 ];
-
-const MAP_PINS = [{ id: 1, x: 50, y: 48 }];
 
 function IconGrad() {
   return (
@@ -31,7 +30,6 @@ function IconGrad() {
 
 const BookParkingPage = () => {
   const [search, setSearch] = useState('');
-  const selectedPin = MAP_PINS[0];
 
   return (
     <div className="book-parking-page">
@@ -123,30 +121,7 @@ const BookParkingPage = () => {
             </div>
 
             <div className="book-parking-map">
-              <div className="book-parking-map-bg" />
-              {MAP_PINS.map((pin) => (
-                <Link
-                  key={pin.id}
-                  to={ALEXANDRIA_LOT_PATH}
-                  className="book-parking-pin active"
-                  style={{ left: `${pin.x}%`, top: `${pin.y}%` }}
-                  aria-label={`${LOT_NAME} — view slots`}
-                >
-                  <span className="book-parking-pin-bubble">P</span>
-                </Link>
-              ))}
-
-              <div
-                className="book-parking-popup"
-                style={{ left: `${selectedPin.x}%`, top: `${selectedPin.y}%` }}
-              >
-                <h4 className="book-parking-popup-title">{LOT_NAME}</h4>
-                <p className="book-parking-popup-dist">1.2 km away</p>
-                <p className="book-parking-popup-spots">0 spots available</p>
-                <Link to={ALEXANDRIA_LOT_PATH} className="book-parking-popup-btn">
-                  Select
-                </Link>
-              </div>
+              <BookParkingMap />
             </div>
           </section>
         </div>
