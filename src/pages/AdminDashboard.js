@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifier } from '../context/NotifierContext';
 import Navbar from '../components/Navbar';
 import './Dashboard.css';
 import { formatEgp } from '../utils/formatEgp';
 
-import { API_BASE, safeFetchJson } from '../config/apiBase';
+import { API_BASE } from '../config/apiOrigin';
+import { fetchWithAuth, safeAdminFetchJson } from '../utils/authFetch';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -60,6 +61,19 @@ const AdminDashboard = () => {
   const [slots, setSlots] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [incidents, setIncidents] = useState([]);
+  const [securityLogs, setSecurityLogs] = useState([]);
+  const [securityLogsLoading, setSecurityLogsLoading] = useState(false);
+  const [securityLogsError, setSecurityLogsError] = useState('');
+  const [filterLogUserId, setFilterLogUserId] = useState('');
+  const [filterLogAction, setFilterLogAction] = useState('');
+  const filterLogUserIdRef = useRef(filterLogUserId);
+  const filterLogActionRef = useRef(filterLogAction);
+  useEffect(() => {
+    filterLogUserIdRef.current = filterLogUserId;
+  }, [filterLogUserId]);
+  useEffect(() => {
+    filterLogActionRef.current = filterLogAction;
+  }, [filterLogAction]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [reservationsLoading, setReservationsLoading] = useState(false);
   const [incidentsLoading, setIncidentsLoading] = useState(false);
@@ -85,11 +99,42 @@ const AdminDashboard = () => {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState('');
 
+  const loadSecurityLogs = useCallback(async () => {
+    setSecurityLogsLoading(true);
+    setSecurityLogsError('');
+    try {
+      const qs = new URLSearchParams();
+      const uid = String(filterLogUserIdRef.current || '').trim();
+      const act = String(filterLogActionRef.current || '').trim();
+      if (uid) qs.set('user_id', uid);
+      if (act) qs.set('action', act);
+      const path = '/admin/logs' + (qs.toString() ? `?${qs.toString()}` : '');
+      const result = await safeAdminFetchJson(path);
+      if (result.error) {
+        setSecurityLogs([]);
+        setSecurityLogsError(result.error);
+        return;
+      }
+      const data = result.data;
+      if (data && data.ok && Array.isArray(data.logs)) {
+        setSecurityLogs(data.logs);
+      } else {
+        setSecurityLogs([]);
+        setSecurityLogsError((data && (data.error || data.message)) || 'Failed to load security logs');
+      }
+    } catch (err) {
+      setSecurityLogs([]);
+      setSecurityLogsError(err.message || 'Cannot load security logs');
+    } finally {
+      setSecurityLogsLoading(false);
+    }
+  }, []);
+
   const loadAnalytics = useCallback(async () => {
     setAnalyticsLoading(true);
     setAnalyticsError('');
     try {
-      const result = await safeFetchJson('/admin/analytics');
+      const result = await safeAdminFetchJson('/admin/analytics');
       if (result.error) {
         setAnalytics(null);
         setAnalyticsError(result.error);
@@ -100,7 +145,7 @@ const AdminDashboard = () => {
         setAnalytics(data.analytics);
       } else {
         setAnalytics(null);
-        setAnalyticsError((data && data.error) || 'Failed to load analytics');
+        setAnalyticsError((data && (data.error || data.message)) || 'Failed to load analytics');
       }
     } catch (err) {
       setAnalytics(null);
@@ -131,10 +176,14 @@ const AdminDashboard = () => {
   }, [activeSection]);
 
   useEffect(() => {
+    if (activeSection === 'security-logs') loadSecurityLogs();
+  }, [activeSection, loadSecurityLogs]);
+
+  useEffect(() => {
     if (userHistoryUserId) {
       setUserHistoryLoading(true);
       setUserHistoryData(null);
-      fetch(`${API_BASE}/admin/users/${userHistoryUserId}/history`)
+      fetchWithAuth(`${API_BASE}/admin/users/${userHistoryUserId}/history`)
         .then((res) => res.json())
         .then((data) => {
           if (data.ok) setUserHistoryData(data);
@@ -150,7 +199,7 @@ const AdminDashboard = () => {
   const loadUsers = async () => {
     setAccountsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/users`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/users`);
       const data = await res.json();
       if (data.ok) setAccounts(data.users || []);
       else setAccounts([]);
@@ -178,7 +227,7 @@ const AdminDashboard = () => {
   const loadReservations = async () => {
     setReservationsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/reservations`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/reservations`);
       const data = await res.json();
       if (data.ok) setReservations(data.reservations || []);
       else setReservations([]);
@@ -192,7 +241,7 @@ const AdminDashboard = () => {
   const loadIncidents = async () => {
     setIncidentsLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/admin/incidents`);
+      const res = await fetchWithAuth(`${API_BASE}/admin/incidents`);
       const data = await res.json();
       if (data.ok) setIncidents(data.incidents || []);
       else setIncidents([]);
@@ -211,14 +260,14 @@ const AdminDashboard = () => {
 
   const updateSlotState = async (slotNo, newState) => {
     try {
-      const res = await fetch(`${API_BASE}/admin/slots/${encodeURIComponent(slotNo)}`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/slots/${encodeURIComponent(slotNo)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ state: newState }),
       });
       const data = await res.json();
       if (data.ok) loadSlots();
-      else toast(data.error || 'Failed to update slot', { variant: 'error' });
+      else toast(data.error || data.message || 'Failed to update slot', { variant: 'error' });
     } catch (e) {
       toast('Network error. Is the backend running?', { variant: 'error' });
     }
@@ -229,7 +278,7 @@ const AdminDashboard = () => {
     const name = newSlotNo.trim();
     if (!name) return;
     try {
-      const res = await fetch(`${API_BASE}/admin/slots`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/slots`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slot_no: name }),
@@ -240,7 +289,7 @@ const AdminDashboard = () => {
         setShowAddSlotModal(false);
         loadSlots();
       } else {
-        toast(data.error || 'Failed to add slot', { variant: 'error' });
+        toast(data.error || data.message || 'Failed to add slot', { variant: 'error' });
       }
     } catch {
       toast('Network error. Is the backend running?', { variant: 'error' });
@@ -272,7 +321,7 @@ const AdminDashboard = () => {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE}/admin/users`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -283,7 +332,7 @@ const AdminDashboard = () => {
         resetForm();
         setShowAddModal(false);
       } else {
-        toast(data.error || 'Failed to create user', { variant: 'error' });
+        toast(data.error || data.message || 'Failed to create user', { variant: 'error' });
       }
     } catch {
       toast('Network error. Is the backend running?', { variant: 'error' });
@@ -296,7 +345,7 @@ const AdminDashboard = () => {
     delete body.username;
     if (!body.password) delete body.password;
     try {
-      const res = await fetch(`${API_BASE}/admin/users/${editingAccount.id}`, {
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${editingAccount.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -308,7 +357,7 @@ const AdminDashboard = () => {
         setEditingAccount(null);
         setShowAddModal(false);
       } else {
-        toast(data.error || 'Failed to update user', { variant: 'error' });
+        toast(data.error || data.message || 'Failed to update user', { variant: 'error' });
       }
     } catch {
       toast('Network error. Is the backend running?', { variant: 'error' });
@@ -325,12 +374,12 @@ const AdminDashboard = () => {
     });
     if (!ok) return;
     try {
-      const res = await fetch(`${API_BASE}/admin/users/${id}`, { method: 'DELETE' });
+      const res = await fetchWithAuth(`${API_BASE}/admin/users/${id}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.ok) {
         loadUsers();
         toast('User deleted.', { variant: 'success' });
-      } else toast(data.error || 'Failed to delete user', { variant: 'error' });
+      } else toast(data.error || data.message || 'Failed to delete user', { variant: 'error' });
     } catch {
       toast('Network error. Is the backend running?', { variant: 'error' });
     }
@@ -426,6 +475,13 @@ const AdminDashboard = () => {
             onClick={() => setActiveSection('incidents')}
           >
             Incidents Reports
+          </button>
+          <button
+            type="button"
+            className={`admin-tab ${activeSection === 'security-logs' ? 'active' : ''}`}
+            onClick={() => setActiveSection('security-logs')}
+          >
+            Security Logs
           </button>
         </div>
 
@@ -900,6 +956,100 @@ const AdminDashboard = () => {
                           </tr>
                         );
                       })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeSection === 'security-logs' && (
+          <div className="dashboard-section">
+            <div className="admin-analytics-header" style={{ marginBottom: 16 }}>
+              <h2 style={{ margin: 0 }}>Security Logs</h2>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={loadSecurityLogs}
+                disabled={securityLogsLoading}
+              >
+                {securityLogsLoading ? 'Refreshing…' : 'Refresh'}
+              </button>
+            </div>
+            <p className="parking-overview-hint" style={{ marginTop: 0 }}>
+              Login, bookings, QR scans, check-in/out. Sorted newest first (max 100). Uses GET /admin/logs.
+            </p>
+            <div
+              className="form-row"
+              style={{ marginBottom: 16, flexWrap: 'wrap', gap: 8, alignItems: 'flex-end' }}
+            >
+              <div className="form-group" style={{ minWidth: 220, marginBottom: 0 }}>
+                <label htmlFor="admin-log-search-action">Search action</label>
+                <input
+                  id="admin-log-search-action"
+                  type="search"
+                  value={filterLogAction}
+                  onChange={(e) => setFilterLogAction(e.target.value)}
+                  placeholder="Text in action (partial match)"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="form-group" style={{ minWidth: 220, marginBottom: 0 }}>
+                <label htmlFor="admin-log-filter-user">Filter by user ID</label>
+                <input
+                  id="admin-log-filter-user"
+                  type="text"
+                  value={filterLogUserId}
+                  onChange={(e) => setFilterLogUserId(e.target.value)}
+                  placeholder="Exact UUID (optional)"
+                  autoComplete="off"
+                />
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={loadSecurityLogs}
+                disabled={securityLogsLoading}
+              >
+                Apply
+              </button>
+            </div>
+            {securityLogsLoading && securityLogs.length === 0 && !securityLogsError ? (
+              <p className="empty-state">Loading security logs…</p>
+            ) : securityLogsError ? (
+              <p className="empty-state slots-error">{securityLogsError}</p>
+            ) : (
+              <div className="table-container">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Action</th>
+                      <th>User ID</th>
+                      <th>Timestamp</th>
+                      <th>IP Address</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {securityLogs.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" style={{ textAlign: 'center', padding: '20px' }}>
+                          No log entries
+                        </td>
+                      </tr>
+                    ) : (
+                      securityLogs.map((row) => (
+                        <tr key={row.id}>
+                          <td className="admin-security-log-action">{row.action || '—'}</td>
+                          <td className="admin-security-log-user">{row.user_id || '—'}</td>
+                          <td>
+                            {row.timestamp
+                              ? new Date(row.timestamp).toLocaleString()
+                              : '—'}
+                          </td>
+                          <td>{row.ip_address || '—'}</td>
+                        </tr>
+                      ))
                     )}
                   </tbody>
                 </table>

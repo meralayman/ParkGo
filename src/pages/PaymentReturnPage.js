@@ -5,6 +5,7 @@ import "./AuthPages.css";
 import { PARKGO_PENDING_SLOT_KEY } from "../constants/pendingSlot";
 
 import { API_BASE } from "../config/apiBase";
+import { fetchWithAuth } from "../utils/authFetch";
 const STORAGE_KEY = "parkgo_pay_pending";
 
 export default function PaymentReturnPage() {
@@ -31,7 +32,7 @@ export default function PaymentReturnPage() {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/reservations`, {
+      const res = await fetchWithAuth(`${API_BASE}/reservations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

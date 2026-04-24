@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifier } from '../context/NotifierContext';
 import Navbar from '../components/Navbar';
 import { apiUrl } from '../config/apiBase';
+import { fetchWithAuth } from '../utils/authFetch';
 import './Dashboard.css';
 
 const ReportIncidentGatekeeperPage = () => {
@@ -56,7 +57,7 @@ const ReportIncidentGatekeeperPage = () => {
       formData.append('gatekeeperUserId', String(user.id));
       if (photo) formData.append('photo', photo);
 
-      const res = await fetch(apiUrl('/incidents/gatekeeper'), {
+      const res = await fetchWithAuth(apiUrl('/incidents/gatekeeper'), {
         method: 'POST',
         body: formData,
       });

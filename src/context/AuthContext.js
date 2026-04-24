@@ -1,5 +1,12 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { API_BASE } from "../config/apiBase";
+import { API_BASE } from '../config/apiOrigin';
+import {
+  persistSession,
+  clearSessionStorage,
+  parkgoFetch,
+  getStoredAccessToken,
+  getStoredRefreshToken,
+} from '../utils/authFetch';
 
 const AuthContext = createContext();
 
@@ -16,7 +23,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in from localStorage
     const storedUser = localStorage.getItem('parkgo_user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
@@ -24,7 +30,20 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+<<<<<<< HEAD
   const login = async (usernameOrEmail, password, options = {}) => {
+=======
+  useEffect(() => {
+    const onRefresh = (e) => {
+      if (e && e.detail) setUser(e.detail);
+    };
+    if (typeof window === 'undefined') return undefined;
+    window.addEventListener('parkgo-auth-refresh', onRefresh);
+    return () => window.removeEventListener('parkgo-auth-refresh', onRefresh);
+  }, []);
+
+  const login = async (usernameOrEmail, password) => {
+>>>>>>> 92cac47d96c2684d44f898ef9e275f93b8225526
     try {
       const { intendedRole } = options;
       const body = { usernameOrEmail, password };
@@ -32,6 +51,7 @@ export const AuthProvider = ({ children }) => {
         body.intendedRole = intendedRole;
       }
       const res = await fetch(`${API_BASE}/auth/login`, {
+<<<<<<< HEAD
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -58,58 +78,72 @@ export const AuthProvider = ({ children }) => {
           code: data.code,
         };
       }
+=======
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usernameOrEmail, password }),
+      });
+
+      const data = await res.json();
+>>>>>>> 92cac47d96c2684d44f898ef9e275f93b8225526
 
       if (!data.ok) {
-        return { success: false, error: data.error || "Invalid username/email or password" };
+        return {
+          success: false,
+          error: data.error || data.message || 'Invalid username/email or password',
+        };
       }
-  
+
       setUser(data.user);
-      localStorage.setItem("parkgo_user", JSON.stringify(data.user));
+      persistSession({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        user: data.user,
+      });
       return { success: true, user: data.user };
     } catch (err) {
-      const msg = err.message || "Network error";
-      const friendly = msg === "Failed to fetch" || msg.includes("NetworkError")
-        ? "Cannot reach the server. Make sure the backend is running on http://localhost:5000"
-        : msg;
+      const msg = err.message || 'Network error';
+      const friendly =
+        msg === 'Failed to fetch' || msg.includes('NetworkError')
+          ? 'Cannot reach the server. Make sure the backend is running on http://localhost:5000'
+          : msg;
       return { success: false, error: friendly };
     }
   };
-  
 
   const signup = async (userData) => {
     try {
       const res = await fetch(`${API_BASE}/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           firstName: userData.firstName,
           lastName: userData.lastName,
           phoneNumber: userData.phoneNumber,
           nationalId: userData.nationalId,
           username: userData.username,
-          email: userData.gmail, // frontend field is gmail
+          email: userData.gmail,
           password: userData.password,
-          role: userData.role || "user",
+          role: userData.role || 'user',
         }),
       });
-  
+
       const data = await res.json();
-  
+
       if (!data.ok) {
-        return { success: false, error: data.error || "Signup failed" };
+        return { success: false, error: data.error || data.message || 'Signup failed' };
       }
-  
-      // Do NOT auto-login; user must log in separately
+
       return { success: true, user: data.user };
     } catch (err) {
-      const msg = err.message || "Network error";
-      const friendly = msg === "Failed to fetch" || msg.includes("NetworkError")
-        ? "Cannot reach the server. Make sure the backend is running on http://localhost:5000"
-        : msg;
+      const msg = err.message || 'Network error';
+      const friendly =
+        msg === 'Failed to fetch' || msg.includes('NetworkError')
+          ? 'Cannot reach the server. Make sure the backend is running on http://localhost:5000'
+          : msg;
       return { success: false, error: friendly };
     }
   };
-  
 
   const loginWithGoogle = async (credential, options = {}) => {
     try {
@@ -119,9 +153,15 @@ export const AuthProvider = ({ children }) => {
         body.intendedRole = intendedRole;
       }
       const res = await fetch(`${API_BASE}/auth/google`, {
+<<<<<<< HEAD
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
+=======
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: credential }),
+>>>>>>> 92cac47d96c2684d44f898ef9e275f93b8225526
       });
       const data = await res.json();
       if (!res.ok) {
@@ -132,23 +172,44 @@ export const AuthProvider = ({ children }) => {
         };
       }
       if (!data.ok) {
-        return { success: false, error: data.error || "Google sign-in failed" };
+        return { success: false, error: data.error || data.message || 'Google sign-in failed' };
       }
       setUser(data.user);
-      localStorage.setItem("parkgo_user", JSON.stringify(data.user));
+      persistSession({
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        user: data.user,
+      });
       return { success: true, user: data.user };
     } catch (err) {
-      const msg = err.message || "Network error";
-      const friendly = msg === "Failed to fetch" || msg.includes("NetworkError")
-        ? "Cannot reach the server. Make sure the backend is running on http://localhost:5000"
-        : msg;
+      const msg = err.message || 'Network error';
+      const friendly =
+        msg === 'Failed to fetch' || msg.includes('NetworkError')
+          ? 'Cannot reach the server. Make sure the backend is running on http://localhost:5000'
+          : msg;
       return { success: false, error: friendly };
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const refresh = getStoredRefreshToken();
+    if (refresh) {
+      const access = getStoredAccessToken();
+      try {
+        await parkgoFetch(`${API_BASE}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(access ? { Authorization: `Bearer ${access}` } : {}),
+          },
+          body: JSON.stringify({ refreshToken: refresh }),
+        });
+      } catch {
+        /* still clear local session */
+      }
+    }
+    clearSessionStorage();
     setUser(null);
-    localStorage.removeItem('parkgo_user');
   };
 
   const value = {
@@ -157,7 +218,7 @@ export const AuthProvider = ({ children }) => {
     loginWithGoogle,
     signup,
     logout,
-    loading
+    loading,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

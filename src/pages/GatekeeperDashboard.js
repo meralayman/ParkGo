@@ -7,6 +7,7 @@ import "./Dashboard.css";
 import { formatEgp } from "../utils/formatEgp";
 
 import { API_BASE } from "../config/apiBase";
+import { fetchWithAuth } from "../utils/authFetch";
 import { CHECK_IN_DEADLINE_MINUTES } from "../constants/checkInDeadline";
 
 const QR_READER_ID = "gatekeeper-qr-reader";
@@ -45,30 +46,38 @@ const GatekeeperDashboard = () => {
     return Number.isNaN(n) ? null : n;
   };
 
-  const loadBooking = useCallback(async (rawInput) => {
-    const bookingId = parseBookingId(rawInput);
-    if (bookingId == null) {
-      setStatusMsg("Please enter a valid booking ID (number from the QR).");
-      return;
-    }
+  const isLikelySignedQr = (raw) => {
+    const s = String(raw ?? "").trim();
+    if (s.length < 20) return false;
+    const parts = s.split(".");
+    return parts.length === 3;
+  };
 
+  const loadBooking = useCallback(async (rawInput) => {
     setLoading(true);
     setStatusMsg("Validating...");
     setReservation(null);
     setNextAction(null);
     setCameraError("");
 
-    try {
-      const res = await fetch(`${API_BASE}/gate/booking/${bookingId}`);
-      const data = await res.json();
+    const trimmed = String(rawInput ?? "").trim();
+    if (!trimmed) {
+      setStatusMsg("Please scan a booking QR or enter a booking ID number.");
+      setLoading(false);
+      return;
+    }
 
+    const applyLoaded = (data) => {
       if (!data.ok) {
         setStatusMsg(data.error || "Invalid booking");
-        setLoading(false);
         return;
       }
-
-      setToken(String(bookingId));
+      const id = data.reservation && data.reservation.id;
+      if (id == null) {
+        setStatusMsg("Invalid response from server.");
+        return;
+      }
+      setToken(String(id));
       setReservation(data.reservation);
       setNextAction(data.nextAction);
       setStatusMsg(
@@ -78,6 +87,39 @@ const GatekeeperDashboard = () => {
             ? "Customer checked in — you can check out (exit)."
             : "Loaded booking."
       );
+    };
+
+    try {
+      if (isLikelySignedQr(trimmed)) {
+        const res = await fetchWithAuth(`${API_BASE}/gate/qr/preview`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ qr: trimmed }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.ok) {
+          setStatusMsg(
+            data.error || (res.status === 401 ? "QR code expired" : "Invalid QR code")
+          );
+        } else {
+          applyLoaded(data);
+        }
+        return;
+      }
+
+      const bookingId = parseBookingId(trimmed);
+      if (bookingId == null) {
+        setStatusMsg("Please enter a valid booking ID number, or scan the signed parking QR.");
+        return;
+      }
+
+      const res = await fetchWithAuth(`${API_BASE}/gate/booking/${bookingId}`);
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setStatusMsg(data.error || "Invalid booking");
+        return;
+      }
+      applyLoaded(data);
     } catch (e) {
       setStatusMsg(e.message || "Cannot reach server");
     } finally {
@@ -94,7 +136,7 @@ const GatekeeperDashboard = () => {
     setLoading(true);
     setStatusMsg("Checking in...");
     try {
-      const res = await fetch(`${API_BASE}/gate/check-in`, {
+      const res = await fetchWithAuth(`${API_BASE}/gate/check-in`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId }),
@@ -123,7 +165,7 @@ const GatekeeperDashboard = () => {
     setLoading(true);
     setStatusMsg("Checking out...");
     try {
-      const res = await fetch(`${API_BASE}/gate/check-out`, {
+      const res = await fetchWithAuth(`${API_BASE}/gate/check-out`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId }),
@@ -233,7 +275,7 @@ const GatekeeperDashboard = () => {
           return;
         }
         scannerRef.current = instance;
-        setStatusMsg("Point the camera at the customer's booking QR (booking ID).");
+            setStatusMsg("Point the camera at the customer's parking QR.");
       } catch (err) {
         if (!cancelled) {
           setCameraError(
@@ -291,9 +333,9 @@ const GatekeeperDashboard = () => {
         <div className="dashboard-section">
           <h2>Scan booking QR</h2>
           <p className="gatekeeper-hint">
-            QR contains the booking ID only. First scan = entry (check-in), second = exit (check-out). Check-in must
-            happen within {CHECK_IN_DEADLINE_MINUTES} minutes after the booking start time, or the reservation is
-            cancelled and the slot is freed automatically.
+            The QR is a signed token (or use the booking ID number for manual entry). First scan = entry (check-in),
+            second = exit (check-out). Check-in must happen within {CHECK_IN_DEADLINE_MINUTES} minutes after the
+            booking start time, or the reservation is cancelled and the slot is freed automatically.
           </p>
 
           <div className="gatekeeper-scanner-actions">
@@ -371,10 +413,11 @@ const GatekeeperDashboard = () => {
           <div className="gatekeeper-manual-row">
             <input
               type="text"
-              inputMode="numeric"
+              inputMode="text"
+              autoComplete="off"
               value={token}
               onChange={(e) => setToken(e.target.value)}
-              placeholder="Booking ID (number)..."
+              placeholder="Booking ID or signed QR text..."
               className="gatekeeper-token-input"
             />
             <button

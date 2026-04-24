@@ -6,6 +6,7 @@ import './AuthPages.css';
 import './Dashboard.css';
 import { formatEgp } from '../utils/formatEgp';
 import { API_BASE, apiUnreachableMessage, apiBaseForErrors } from '../config/apiBase';
+import { fetchWithAuth } from '../utils/authFetch';
 
 const PAY_PENDING_KEY = 'parkgo_pay_pending';
 
@@ -80,7 +81,7 @@ const PaymentPage = () => {
         })
       );
 
-      const res = await fetch(`${API_BASE}/paymob/session`, {
+      const res = await fetchWithAuth(`${API_BASE}/paymob/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

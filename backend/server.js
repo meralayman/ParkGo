@@ -7,8 +7,23 @@ const multer = require("multer");
 const { Pool } = require("pg");
 const bcrypt = require("bcrypt");
 const crypto = require("crypto");
+const { requireAdmin } = require("./middleware/auth");
+const { bookingRateLimiter, qrRateLimiter } = require("./middleware/rateLimits");
+const {
+  buildBookingQrJwtForRow,
+  computeQrExpiresAt,
+  resolveQrExpiresAt,
+  signReservationQrJwt,
+  verifyBookingQrDetailed,
+  ensureBookingQrColumns,
+} = require("./qrJwt");
+const { computeQuote, ensureDynamicHourlyRateColumn } = require("./smartParking");
+const { logAudit, ensureAuditLogsTable, clientIp } = require("./auditLog");
 
 const app = express();
+if (process.env.TRUST_PROXY === "1") {
+  app.set("trust proxy", 1);
+}
 app.use(cors());
 app.use(express.json());
 
@@ -194,8 +209,77 @@ app.post("/api/intrusion-detect", async (req, res) => {
 
 /** EGP per hour — new bookings and voluntary “add 1 hour” */
 const PARKING_HOURLY_RATE = Number(process.env.PARKING_HOURLY_RATE) || 5;
-/** EGP per hour for staying past end_time without extending — charged at gate checkout (per full hour, rounded up). Defaults to PARKING_HOURLY_RATE. */
+/** EGP per hour for staying past end_time without extending — legacy fallback if `dynamic_hourly_rate` is not stored on the booking. */
 const OVERSTAY_HOURLY_RATE = Number(process.env.OVERSTAY_HOURLY_RATE) || PARKING_HOURLY_RATE;
+
+const MS_PER_HOUR = 60 * 60 * 1000;
+
+function roundMoney(n) {
+  return Math.round(Number(n) * 100) / 100;
+}
+
+function storedDynamicHourly(row) {
+  if (!row) return null;
+  const v = row.dynamic_hourly_rate != null ? Number(row.dynamic_hourly_rate) : NaN;
+  if (Number.isFinite(v) && v > 0) return v;
+  return null;
+}
+
+/** In-session rate: `dynamic_hourly_rate` from booking, else `PARKING_HOURLY_RATE`. */
+function baseParkingHourlyRate(row) {
+  return storedDynamicHourly(row) ?? PARKING_HOURLY_RATE;
+}
+
+/** After scheduled end: `dynamic_hourly_rate` when stored, else `OVERSTAY_HOURLY_RATE` (penalty / legacy). */
+function lateOverstayHourlyRate(row) {
+  return storedDynamicHourly(row) ?? OVERSTAY_HOURLY_RATE;
+}
+
+/**
+ * On checkout: base bill for time from check-in to min(check-out, scheduled end) only;
+ * late fee for time after scheduled end (separate, no double-counting).
+ * @returns {{ baseAmount: number, baseHours: number, lateFeeAmount: number, lateHours: number, lateFeeApplied: boolean, totalAmount: number, dynamicHourlyRate: number | null, baseHourlyRate: number, lateHourlyRate: number }}
+ */
+function computeCheckoutAmounts(row, checkOutAt) {
+  const ci = new Date(row.check_in_time);
+  const end = new Date(row.end_time);
+  const co = new Date(checkOutAt);
+  const baseHr = baseParkingHourlyRate(row);
+  const lateHr = lateOverstayHourlyRate(row);
+  const dyn = storedDynamicHourly(row);
+
+  const endBoundaryMs = Math.min(co.getTime(), end.getTime());
+  const spanMs = Math.max(0, endBoundaryMs - ci.getTime());
+  const baseHours = Math.max(1, Math.ceil(spanMs / MS_PER_HOUR));
+  const baseAmount = roundMoney(baseHours * baseHr);
+
+  let lateHours = 0;
+  let lateFeeAmount = 0;
+  if (co.getTime() > end.getTime()) {
+    const lateMs = co.getTime() - end.getTime();
+    lateHours = Math.ceil(lateMs / MS_PER_HOUR);
+    lateFeeAmount = roundMoney(lateHours * lateHr);
+  }
+
+  return {
+    baseAmount,
+    baseHours,
+    lateFeeAmount,
+    lateHours,
+    lateFeeApplied: lateFeeAmount > 0,
+    totalAmount: roundMoney(baseAmount + lateFeeAmount),
+    dynamicHourlyRate: dyn,
+    baseHourlyRate: baseHr,
+    lateHourlyRate: lateHr,
+  };
+}
+
+async function ensureLateFeeColumns(pool) {
+  await pool.query(`ALTER TABLE reservations ADD COLUMN IF NOT EXISTS late_fee_applied BOOLEAN DEFAULT FALSE`);
+  await pool.query(
+    `ALTER TABLE reservations ADD COLUMN IF NOT EXISTS late_fee_amount DECIMAL(12,2) DEFAULT 0`
+  );
+}
 /** Earliest check-in before scheduled start_time */
 const EARLY_CHECKIN_MINUTES = Number(process.env.EARLY_CHECKIN_MINUTES) || 60;
 /**
@@ -322,13 +406,24 @@ function apiError(err) {
   return msg;
 }
 
+const { registerAuthRoutes } = require("./routes/authRoutes");
+registerAuthRoutes(app, { pool, apiError, logAudit });
+
 /* -------------------- ROOT -------------------- */
 app.get("/", (req, res) => {
   res.json({
     name: "ParkGo API",
     message: "Backend is running. Use the frontend app to sign up or log in.",
     health: "/health",
-    auth: { login: "POST /auth/login", signup: "POST /auth/signup" },
+    auth: {
+      register: "POST /auth/register",
+      signup: "POST /auth/signup",
+      login: "POST /auth/login",
+      refresh: "POST /auth/refresh",
+      logout: "POST /auth/logout",
+      me: "GET /auth/me (Authorization: Bearer access token)",
+      google: "POST /auth/google",
+    },
     demandMl: {
       predict: "POST /api/predict-demand → Flask /predict",
       forecast: "GET /api/forecast → Flask /forecast",
@@ -646,6 +741,7 @@ app.post("/incidents/gatekeeper", (req, res, next) => {
   }
 });
 
+<<<<<<< HEAD
 /* -------------------- AUTH -------------------- */
 app.post("/auth/signup", async (req, res) => {
   try {
@@ -849,6 +945,8 @@ app.post("/auth/google", async (req, res) => {
   }
 });
 
+=======
+>>>>>>> 92cac47d96c2684d44f898ef9e275f93b8225526
 /* -------------------- SLOTS (parking_slots) -------------------- */
 app.get("/slots", async (req, res) => {
   try {
@@ -871,7 +969,7 @@ app.get("/slots", async (req, res) => {
  * - else: first available slot (state = 0)
  * - insert into reservations, set slot state to 2 (reserved)
  */
-app.post("/reservations", async (req, res) => {
+app.post("/reservations", bookingRateLimiter, async (req, res) => {
   const client = await pool.connect();
   try {
     const { userId, startTime, endTime, totalAmount, paymentMethod, slotNo: bodySlotNo, slot_no } = req.body;
@@ -917,12 +1015,22 @@ app.post("/reservations", async (req, res) => {
     }
 
     const reservedSlotNo = slotRes.rows[0].slot_no;
-    const qrToken = crypto.randomUUID();
+    const qrExpiresAt = computeQrExpiresAt(endTime);
+
+    let dynamicHourly = null;
+    try {
+      const quote = await computeQuote(client, startTime, endTime);
+      if (quote && Number.isFinite(quote.hourlyRateEgp)) {
+        dynamicHourly = roundMoney(quote.hourlyRateEgp);
+      }
+    } catch {
+      /* best-effort pricing */
+    }
 
     const ins = await client.query(
       `INSERT INTO reservations
-        (user_id, slot_no, start_time, end_time, status, payment_method, total_amount, qr_token)
-       VALUES ($1, $2, $3, $4, 'confirmed', $5, $6, $7)
+        (user_id, slot_no, start_time, end_time, status, payment_method, total_amount, qr_token, qr_expires_at, dynamic_hourly_rate)
+       VALUES ($1, $2, $3, $4, 'confirmed', $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         userId,
@@ -931,9 +1039,13 @@ app.post("/reservations", async (req, res) => {
         endTime,
         paymentMethod || null,
         totalAmount || 0,
-        qrToken,
+        null,
+        qrExpiresAt,
+        dynamicHourly,
       ]
     );
+
+    const row = ins.rows[0];
 
     // mark slot reserved (2)
     await client.query(
@@ -944,7 +1056,16 @@ app.post("/reservations", async (req, res) => {
     );
 
     await client.query("COMMIT");
-    return res.json({ ok: true, reservation: ins.rows[0] });
+    const reservationOut = { ...row };
+    const qrJwt = signReservationQrJwt(reservationOut.id);
+    delete reservationOut.qr_token;
+    reservationOut.qrJwt = qrJwt;
+    logAudit(pool, {
+      userId,
+      action: `BOOKING: Booking ${reservationOut.id} created by user ${userId}`,
+      ip: clientIp(req),
+    });
+    return res.json({ ok: true, reservation: reservationOut, qrJwt });
   } catch (err) {
     await client.query("ROLLBACK");
     return res.status(500).json({ ok: false, error: apiError(err) });
@@ -967,14 +1088,22 @@ app.get("/reservations/user/:userId", async (req, res) => {
       [userId]
     );
 
-    res.json({ ok: true, reservations: r.rows });
+    const reservations = r.rows.map((row) => {
+      const o = { ...row };
+      const q = buildBookingQrJwtForRow(o);
+      if (q) o.qrJwt = q;
+      delete o.qr_token;
+      return o;
+    });
+
+    res.json({ ok: true, reservations });
   } catch (err) {
     res.status(500).json({ ok: false, error: apiError(err) });
   }
 });
 
 /* -------------------- ADMIN: list users -------------------- */
-app.get("/admin/users", async (req, res) => {
+app.get("/admin/users", requireAdmin, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT id, first_name, last_name, email, username, phone_number, national_id, role, created_at
@@ -1010,7 +1139,7 @@ app.get("/admin/security-alerts", async (req, res) => {
 });
 
 /* -------------------- ADMIN: single user detailed history -------------------- */
-app.get("/admin/users/:id/history", async (req, res) => {
+app.get("/admin/users/:id/history", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const userRes = await pool.query(
@@ -1050,7 +1179,7 @@ app.get("/admin/users/:id/history", async (req, res) => {
 });
 
 /* -------------------- ADMIN: update user -------------------- */
-app.patch("/admin/users/:id", async (req, res) => {
+app.patch("/admin/users/:id", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { first_name, last_name, phone_number, national_id, role, password } = req.body;
@@ -1092,7 +1221,7 @@ app.patch("/admin/users/:id", async (req, res) => {
 });
 
 /* -------------------- ADMIN: create user -------------------- */
-app.post("/admin/users", async (req, res) => {
+app.post("/admin/users", requireAdmin, async (req, res) => {
   try {
     const { first_name, last_name, email, username, password, phone_number, national_id, role } = req.body;
     if (!first_name || !last_name || !email || !username || !password) {
@@ -1126,7 +1255,7 @@ app.post("/admin/users", async (req, res) => {
 });
 
 /* -------------------- ADMIN: delete user -------------------- */
-app.delete("/admin/users/:id", async (req, res) => {
+app.delete("/admin/users/:id", requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const r = await pool.query("DELETE FROM users WHERE id = $1 RETURNING id", [id]);
@@ -1143,7 +1272,7 @@ app.delete("/admin/users/:id", async (req, res) => {
 });
 
 /* -------------------- ADMIN: all reservations + payment details -------------------- */
-app.get("/admin/reservations", async (req, res) => {
+app.get("/admin/reservations", requireAdmin, async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT r.id, r.user_id, r.slot_no, r.start_time, r.end_time, r.status,
@@ -1159,8 +1288,57 @@ app.get("/admin/reservations", async (req, res) => {
   }
 });
 
+/** Audit trail (admin only). Query: ?user_id=<uuid>&action=<partial> */
+app.get("/admin/logs", requireAdmin, async (req, res) => {
+  try {
+    const rawUser = req.query.user_id != null ? String(req.query.user_id).trim() : "";
+    const rawAction = req.query.action != null ? String(req.query.action).trim() : "";
+
+    const conds = [];
+    const params = [];
+    let p = 1;
+
+    if (rawUser) {
+      if (!UUID_RE.test(rawUser)) {
+        return res.status(400).json({ ok: false, error: "user_id must be a valid UUID when provided" });
+      }
+      conds.push(`user_id = $${p++}`);
+      params.push(rawUser);
+    }
+    if (rawAction) {
+      conds.push(`action ILIKE $${p++}`);
+      params.push(`%${rawAction}%`);
+    }
+
+    const whereSql = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    params.push(100);
+    const limitIdx = p;
+
+    const r = await pool.query(
+      `SELECT id, user_id, action, "timestamp" AS log_ts, ip_address
+       FROM logs
+       ${whereSql}
+       ORDER BY "timestamp" DESC
+       LIMIT $${limitIdx}`,
+      params
+    );
+
+    const logs = r.rows.map((row) => ({
+      id: row.id,
+      user_id: row.user_id,
+      action: row.action,
+      timestamp: row.log_ts,
+      ip_address: row.ip_address,
+    }));
+
+    return res.json({ ok: true, logs, limit: 100 });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: apiError(err) });
+  }
+});
+
 /* -------------------- ADMIN: all incident reports (users + gatekeepers) -------------------- */
-app.get("/admin/incidents", async (req, res) => {
+app.get("/admin/incidents", requireAdmin, async (req, res) => {
   try {
     await ensureIncidentReportsTable();
     const r = await pool.query(
@@ -1193,7 +1371,7 @@ app.get("/admin/incidents", async (req, res) => {
 });
 
 /** Aggregated booking analytics: counts, peak hours, popular spots, usage. */
-app.get("/admin/analytics", async (req, res) => {
+app.get("/admin/analytics", requireAdmin, async (req, res) => {
   try {
     const totalR = await pool.query("SELECT COUNT(*)::int AS c FROM reservations");
     const totalBookings = totalR.rows[0].c;
@@ -1289,7 +1467,7 @@ app.get("/admin/analytics", async (req, res) => {
 });
 
 /* -------------------- ADMIN: add slot -------------------- */
-app.post("/admin/slots", async (req, res) => {
+app.post("/admin/slots", requireAdmin, async (req, res) => {
   try {
     const { slot_no } = req.body;
     if (!slot_no || String(slot_no).trim() === "") {
@@ -1311,7 +1489,7 @@ app.post("/admin/slots", async (req, res) => {
 });
 
 /* -------------------- ADMIN: update slot state -------------------- */
-app.patch("/admin/slots/:slotNo", async (req, res) => {
+app.patch("/admin/slots/:slotNo", requireAdmin, async (req, res) => {
   try {
     const { slotNo } = req.params;
     const { state } = req.body;
@@ -1455,7 +1633,7 @@ app.post("/reservations/:id/overstay-extend", async (req, res) => {
   }
 });
 
-// -------------------- GATEKEEPER (QR = booking id only) --------------------
+// -------------------- GATEKEEPER (QR = signed JWT or legacy numeric booking id) --------------------
 
 function bookingNextAction(status) {
   if (status === "confirmed") return "check-in";
@@ -1463,7 +1641,98 @@ function bookingNextAction(status) {
   return null;
 }
 
-/** Preview booking after scanning QR (numeric id). */
+/**
+ * Verify signed booking QR (JWT) and return same shape as GET /gate/booking/:id.
+ * POST { "qr": "<jwt>" }
+ */
+app.post("/gate/qr/preview", qrRateLimiter, async (req, res) => {
+  console.log("[IP CHECK]", req.ip);
+  const raw = req.body && req.body.qr;
+  if (!raw || typeof raw !== "string" || !raw.trim()) {
+    return res.status(400).json({ ok: false, error: "Field \"qr\" with the scanned token is required" });
+  }
+
+  const v = verifyBookingQrDetailed(raw.trim());
+  if (!v.ok) {
+    const code = v.code || "INVALID";
+    const status = code === "EXPIRED" ? 401 : 400;
+    return res.status(status).json({ ok: false, error: v.error, code });
+  }
+
+  const { bookingId, userId, jti, isSimpleReservationQr } = v.payload;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    await sweepNoShows(client);
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    client.release();
+    return res.status(500).json({ ok: false, error: apiError(err) });
+  }
+  client.release();
+
+  try {
+    const r = await pool.query(
+      `SELECT id, user_id, slot_no, start_time, end_time, status, payment_method, total_amount,
+              check_in_time, check_out_time, qr_token, created_at, qr_expires_at
+       FROM reservations WHERE id = $1`,
+      [bookingId]
+    );
+
+    if (r.rowCount === 0) {
+      return res.status(404).json({ ok: false, error: "Booking not found", code: "NOT_FOUND" });
+    }
+
+    const reservation = r.rows[0];
+    if (!isSimpleReservationQr) {
+      if (String(reservation.user_id) !== String(userId)) {
+        return res.status(400).json({ ok: false, error: "Invalid QR code (user mismatch)", code: "MISMATCH" });
+      }
+      if (reservation.qr_token == null || String(reservation.qr_token) !== jti) {
+        return res.status(400).json({
+          ok: false,
+          error: "This QR code is no longer valid (already used or revoked)",
+          code: "USED_OR_REVOKED",
+        });
+      }
+      const effectiveExp = resolveQrExpiresAt(reservation);
+      if (!effectiveExp) {
+        return res.status(400).json({
+          ok: false,
+          error: "Booking has no valid QR expiration (missing end time)",
+          code: "NO_EXPIRY",
+        });
+      }
+      if (effectiveExp.getTime() < Date.now()) {
+        return res.status(401).json({ ok: false, error: "This QR code has expired", code: "EXPIRED" });
+      }
+    }
+
+    if (["closed", "cancelled", "no_show"].includes(reservation.status)) {
+      return res.status(400).json({
+        ok: false,
+        error: `This booking is ${reservation.status}. Further scans are not allowed.`,
+        code: "INACTIVE",
+      });
+    }
+
+    const nextAction = bookingNextAction(reservation.status);
+    const safe = { ...reservation };
+    delete safe.qr_token;
+    logAudit(pool, {
+      userId: String(reservation.user_id),
+      action: `QR_SCAN: QR scanned for booking ${reservation.id} (user ${reservation.user_id})`,
+      ip: clientIp(req),
+    });
+    return res.json({ ok: true, reservation: safe, nextAction });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: apiError(err) });
+  }
+});
+
+/** Preview booking by numeric id (legacy manual entry) or scan of old QRs. */
 app.get("/gate/booking/:bookingId", async (req, res) => {
   const bookingId = parseInt(req.params.bookingId, 10);
   if (Number.isNaN(bookingId)) {
@@ -1485,7 +1754,7 @@ app.get("/gate/booking/:bookingId", async (req, res) => {
   try {
     const r = await pool.query(
       `SELECT id, user_id, slot_no, start_time, end_time, status, payment_method, total_amount,
-              check_in_time, check_out_time, qr_token, created_at
+              check_in_time, check_out_time, qr_token, created_at, qr_expires_at
        FROM reservations WHERE id = $1`,
       [bookingId]
     );
@@ -1504,7 +1773,9 @@ app.get("/gate/booking/:bookingId", async (req, res) => {
     }
 
     const nextAction = bookingNextAction(reservation.status);
-    return res.json({ ok: true, reservation, nextAction });
+    const safe = { ...reservation };
+    delete safe.qr_token;
+    return res.json({ ok: true, reservation: safe, nextAction });
   } catch (err) {
     return res.status(500).json({ ok: false, error: apiError(err) });
   }
@@ -1523,7 +1794,7 @@ app.post("/gate/check-in", async (req, res) => {
     await sweepNoShows(client);
 
     const r = await client.query(
-      `SELECT id, slot_no, status, start_time, end_time, check_in_time
+      `SELECT id, user_id, slot_no, status, start_time, end_time, check_in_time
        FROM reservations WHERE id = $1 FOR UPDATE`,
       [bookingId]
     );
@@ -1582,6 +1853,12 @@ app.post("/gate/check-in", async (req, res) => {
 
     await client.query("COMMIT");
 
+    logAudit(pool, {
+      userId: row.user_id != null ? String(row.user_id) : null,
+      action: `GATE: User ${row.user_id ?? "unknown"} checked in for booking ${bookingId}`,
+      ip: clientIp(req),
+    });
+
     return res.json({
       ok: true,
       message: "Checked in — gate may open for entry",
@@ -1610,7 +1887,7 @@ app.post("/gate/check-out", async (req, res) => {
     await sweepNoShows(client);
 
     const r = await client.query(
-      `SELECT id, slot_no, status, start_time, end_time, check_in_time, check_out_time, total_amount
+      `SELECT id, user_id, slot_no, status, start_time, end_time, check_in_time, check_out_time, total_amount, dynamic_hourly_rate
        FROM reservations WHERE id = $1 FOR UPDATE`,
       [bookingId]
     );
@@ -1640,27 +1917,29 @@ app.post("/gate/check-out", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Missing check-in time" });
     }
 
-    const ci = new Date(row.check_in_time);
     const co = new Date();
-    const end = new Date(row.end_time);
-
-    const durationMs = co.getTime() - ci.getTime();
-    const durationHours = Math.max(1, Math.ceil(durationMs / (60 * 60 * 1000)));
-    let totalAmount = durationHours * PARKING_HOURLY_RATE;
-
-    if (co > end) {
-      const overstayMs = co.getTime() - end.getTime();
-      const overstayHours = Math.ceil(overstayMs / (60 * 60 * 1000));
-      totalAmount += overstayHours * OVERSTAY_HOURLY_RATE;
-    }
+    const {
+      baseAmount,
+      baseHours,
+      lateFeeAmount,
+      lateHours,
+      lateFeeApplied,
+      totalAmount,
+      dynamicHourlyRate,
+      baseHourlyRate,
+      lateHourlyRate,
+    } = computeCheckoutAmounts(row, co);
 
     await client.query(
       `UPDATE reservations
        SET status = 'closed',
            check_out_time = NOW(),
-           total_amount = $1
-       WHERE id = $2`,
-      [totalAmount, bookingId]
+           total_amount = $1,
+           late_fee_applied = $2,
+           late_fee_amount = $3,
+           qr_token = NULL
+       WHERE id = $4`,
+      [totalAmount, lateFeeApplied, lateFeeAmount, bookingId]
     );
 
     await client.query(
@@ -1670,13 +1949,26 @@ app.post("/gate/check-out", async (req, res) => {
 
     await client.query("COMMIT");
 
+    logAudit(pool, {
+      userId: row.user_id != null ? String(row.user_id) : null,
+      action: `GATE: User ${row.user_id ?? "unknown"} checked out for booking ${bookingId}`,
+      ip: clientIp(req),
+    });
+
     return res.json({
       ok: true,
       message: "Checked out — booking closed (paid total calculated)",
       bookingId,
       slotNo: row.slot_no,
       checkOutTime: co.toISOString(),
-      durationHours,
+      baseAmount,
+      parkingHoursBilled: baseHours,
+      lateFeeAmount,
+      lateHours,
+      lateFeeApplied,
+      dynamicHourlyRateEgp: dynamicHourlyRate,
+      baseHourlyRateEgp: baseHourlyRate,
+      lateFeeHourlyRateEgp: lateHourlyRate,
       totalAmount,
       paid: true,
     });
@@ -1758,9 +2050,36 @@ app.listen(PORT, async () => {
     console.error("[ParkGo] incident_reports table:", e?.message || e);
   }
   try {
+<<<<<<< HEAD
     await ensureSecurityAlertsTable();
   } catch (e) {
     console.error("[ParkGo] security_alerts table:", e?.message || e);
+=======
+    const { ensureAuthSchema } = require("./ensureAuthSchema");
+    await ensureAuthSchema(pool);
+  } catch (e) {
+    console.error("[ParkGo] auth schema:", e?.message || e);
+  }
+  try {
+    await ensureBookingQrColumns(pool);
+  } catch (e) {
+    console.error("[ParkGo] booking QR columns:", e?.message || e);
+  }
+  try {
+    await ensureDynamicHourlyRateColumn(pool);
+  } catch (e) {
+    console.error("[ParkGo] dynamic_hourly_rate column:", e?.message || e);
+  }
+  try {
+    await ensureLateFeeColumns(pool);
+  } catch (e) {
+    console.error("[ParkGo] late fee columns:", e?.message || e);
+  }
+  try {
+    await ensureAuditLogsTable(pool);
+  } catch (e) {
+    console.error("[ParkGo] audit logs table:", e?.message || e);
+>>>>>>> 92cac47d96c2684d44f898ef9e275f93b8225526
   }
   await ensureAdmin();
   await ensureGatekeeper();
