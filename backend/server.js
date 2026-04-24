@@ -82,20 +82,6 @@ function clearPasswordLoginState(key) {
   passwordLoginState.delete(key);
 }
 
-/** Failed password attempts on **admin sign-in only** (`intendedRole: admin`), per identifier key. */
-/** @type {Map<string, number>} */
-const adminSignInPasswordFails = new Map();
-
-function incrementAdminSignInPasswordFail(key) {
-  const n = (adminSignInPasswordFails.get(key) || 0) + 1;
-  adminSignInPasswordFails.set(key, n);
-  return n;
-}
-
-function clearAdminSignInPasswordFails(key) {
-  adminSignInPasswordFails.delete(key);
-}
-
 /**
  * Record a failed password for this identifier. On the 4th fail, start 5 min lockout.
  * Returns the updated state; if locked, caller should respond 429.
@@ -563,30 +549,6 @@ async function recordNonAdminAdminLoginAttempt(req, user) {
   }
 }
 
-/** Four wrong passwords on the admin sign-in page for the same identifier (password flow only). */
-async function recordAdminSignInBruteForceAttempt(req, identifierForDisplay) {
-  const ip = getClientIp(req);
-  const ua = req.get ? req.get("user-agent") : req.headers["user-agent"] || "";
-  const message =
-    `Admin sign-in: 4 failed password attempts for "${identifierForDisplay}". ` +
-    `Possible unauthorized access to the admin login. IP: ${ip || "unknown"}.`;
-  const details = {
-    identifier: identifierForDisplay,
-    clientIp: ip,
-    userAgent: ua,
-  };
-  try {
-    await ensureSecurityAlertsTable();
-    await pool.query(
-      `INSERT INTO security_alerts (alert_type, message, details) VALUES ($1, $2, $3::jsonb)`,
-      ["admin_signin_bruteforce", message, JSON.stringify(details)]
-    );
-    console.warn(`[Security] ${message}`);
-  } catch (e) {
-    console.error("[Security] failed to store brute-force alert:", e?.message || e);
-  }
-}
-
 async function assertRequestingUserIsAdmin(userId) {
   if (userId === undefined || userId === null || String(userId).trim() === "") {
     return null;
@@ -741,7 +703,6 @@ app.post("/incidents/gatekeeper", (req, res, next) => {
   }
 });
 
-<<<<<<< HEAD
 /* -------------------- AUTH -------------------- */
 app.post("/auth/signup", async (req, res) => {
   try {
@@ -817,13 +778,6 @@ app.post("/auth/login", async (req, res) => {
 
     if (r.rowCount === 0) {
       const st = recordFailedPasswordLogin(key);
-      if (wantAdmin) {
-        const adminN = incrementAdminSignInPasswordFail(key);
-        if (adminN >= 4) {
-          clearAdminSignInPasswordFails(key);
-          await recordAdminSignInBruteForceAttempt(req, String(identifier).trim());
-        }
-      }
       if (st.lockedUntil && Date.now() < st.lockedUntil) {
         return res.status(429).json({
           ok: false,
@@ -840,13 +794,6 @@ app.post("/auth/login", async (req, res) => {
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
       const st = recordFailedPasswordLogin(key);
-      if (wantAdmin) {
-        const adminN = incrementAdminSignInPasswordFail(key);
-        if (adminN >= 4) {
-          clearAdminSignInPasswordFails(key);
-          await recordAdminSignInBruteForceAttempt(req, String(identifier).trim());
-        }
-      }
       if (st.lockedUntil && Date.now() < st.lockedUntil) {
         return res.status(429).json({
           ok: false,
@@ -860,7 +807,6 @@ app.post("/auth/login", async (req, res) => {
     }
 
     clearPasswordLoginState(key);
-    clearAdminSignInPasswordFails(key);
     delete user.password_hash;
     if (wantAdmin && user.role !== "admin") {
       await recordNonAdminAdminLoginAttempt(req, user);
@@ -945,8 +891,6 @@ app.post("/auth/google", async (req, res) => {
   }
 });
 
-=======
->>>>>>> 92cac47d96c2684d44f898ef9e275f93b8225526
 /* -------------------- SLOTS (parking_slots) -------------------- */
 app.get("/slots", async (req, res) => {
   try {
@@ -2050,11 +1994,11 @@ app.listen(PORT, async () => {
     console.error("[ParkGo] incident_reports table:", e?.message || e);
   }
   try {
-<<<<<<< HEAD
     await ensureSecurityAlertsTable();
   } catch (e) {
     console.error("[ParkGo] security_alerts table:", e?.message || e);
-=======
+  }
+  try {
     const { ensureAuthSchema } = require("./ensureAuthSchema");
     await ensureAuthSchema(pool);
   } catch (e) {
@@ -2079,7 +2023,6 @@ app.listen(PORT, async () => {
     await ensureAuditLogsTable(pool);
   } catch (e) {
     console.error("[ParkGo] audit logs table:", e?.message || e);
->>>>>>> 92cac47d96c2684d44f898ef9e275f93b8225526
   }
   await ensureAdmin();
   await ensureGatekeeper();
