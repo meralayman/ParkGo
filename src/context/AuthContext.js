@@ -30,9 +30,6 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-<<<<<<< HEAD
-  const login = async (usernameOrEmail, password, options = {}) => {
-=======
   useEffect(() => {
     const onRefresh = (e) => {
       if (e && e.detail) setUser(e.detail);
@@ -42,8 +39,7 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener('parkgo-auth-refresh', onRefresh);
   }, []);
 
-  const login = async (usernameOrEmail, password) => {
->>>>>>> 92cac47d96c2684d44f898ef9e275f93b8225526
+  const login = async (usernameOrEmail, password, options = {}) => {
     try {
       const { intendedRole } = options;
       const body = { usernameOrEmail, password };
@@ -51,12 +47,11 @@ export const AuthProvider = ({ children }) => {
         body.intendedRole = intendedRole;
       }
       const res = await fetch(`${API_BASE}/auth/login`, {
-<<<<<<< HEAD
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-  
+
       let data = {};
       try {
         data = await res.json();
@@ -68,24 +63,16 @@ export const AuthProvider = ({ children }) => {
         const msg =
           data.error ||
           (res.status === 401
-            ? "Invalid username/email or password"
-            : "Login failed");
+            ? 'Invalid username/email or password'
+            : 'Login failed');
         return {
           success: false,
           error: msg,
           locked: data.locked === true || res.status === 429,
-          lockoutSeconds: typeof data.lockoutSeconds === "number" ? data.lockoutSeconds : undefined,
+          lockoutSeconds: typeof data.lockoutSeconds === 'number' ? data.lockoutSeconds : undefined,
           code: data.code,
         };
       }
-=======
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usernameOrEmail, password }),
-      });
-
-      const data = await res.json();
->>>>>>> 92cac47d96c2684d44f898ef9e275f93b8225526
 
       if (!data.ok) {
         return {
@@ -153,15 +140,9 @@ export const AuthProvider = ({ children }) => {
         body.intendedRole = intendedRole;
       }
       const res = await fetch(`${API_BASE}/auth/google`, {
-<<<<<<< HEAD
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-=======
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ accessToken: credential }),
->>>>>>> 92cac47d96c2684d44f898ef9e275f93b8225526
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
