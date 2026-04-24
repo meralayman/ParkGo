@@ -52,6 +52,8 @@ GRANT USAGE, SELECT ON SEQUENCE reservations_id_seq TO parkgo_user;
 ALTER TABLE reservations ADD COLUMN IF NOT EXISTS check_in_time TIMESTAMP WITH TIME ZONE;
 ALTER TABLE reservations ADD COLUMN IF NOT EXISTS check_out_time TIMESTAMP WITH TIME ZONE;
 ALTER TABLE reservations ADD COLUMN IF NOT EXISTS late_fee_applied BOOLEAN DEFAULT FALSE;
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS late_fee_amount DECIMAL(12,2) DEFAULT 0;
+ALTER TABLE reservations ADD COLUMN IF NOT EXISTS dynamic_hourly_rate DECIMAL(12,4);
 
 -- Status: confirmed | checked_in | closed | cancelled | no_show
 ALTER TABLE reservations DROP CONSTRAINT IF EXISTS reservations_status_check;
@@ -75,3 +77,16 @@ CREATE TABLE IF NOT EXISTS incident_reports (
 );
 GRANT ALL ON TABLE incident_reports TO parkgo_user;
 GRANT USAGE, SELECT ON SEQUENCE incident_reports_id_seq TO parkgo_user;
+
+-- Audit trail (also ensured at runtime in auditLog.js)
+CREATE TABLE IF NOT EXISTS logs (
+  id BIGSERIAL PRIMARY KEY,
+  user_id UUID,
+  action VARCHAR(500) NOT NULL,
+  "timestamp" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  ip_address VARCHAR(100)
+);
+CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON logs ("timestamp" DESC);
+CREATE INDEX IF NOT EXISTS idx_logs_user_id ON logs (user_id);
+GRANT ALL ON TABLE logs TO parkgo_user;
+GRANT USAGE, SELECT ON SEQUENCE logs_id_seq TO parkgo_user;

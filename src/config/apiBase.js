@@ -25,6 +25,8 @@ function getApiBase() {
 
 export const API_BASE = getApiBase();
 
+/** For requests that need `Authorization: Bearer`, use `fetchWithAuth` from `../utils/authFetch` (reads `localStorage.accessToken`). */
+
 /**
  * GET /api/forecast — in development use a relative URL so Create React App's `proxy`
  * forwards to Express (port 5000). A mis-set REACT_APP_API_BASE_URL (e.g. Flask on :5001)
@@ -44,34 +46,51 @@ const EXPRESS_FORECAST_FALLBACK = 'http://127.0.0.1:5000/api/forecast';
 /**
  * GET /api/forecast as JSON array. Tries {@link apiForecastUrl} first, then Express :5000 directly
  * so forecast still loads if the CRA proxy returns 404 or misroutes.
+ * Per-URL try/catch so a failed proxy (or backend down) still tries the absolute Express URL.
  */
 export async function fetchForecastArray() {
   const urls = [...new Set([apiForecastUrl(), EXPRESS_FORECAST_FALLBACK])];
 
   let lastRes = /** @type {Response | null} */ (null);
   let lastData = /** @type {unknown} */ (null);
+  /** @type {Error | null} */
+  let lastNetworkError = null;
 
   for (const url of urls) {
-    const res = await fetch(url, { headers: { Accept: 'application/json' } });
-    const data = await res.json().catch(() => null);
-    if (res.ok && Array.isArray(data)) {
-      return data;
+    try {
+      const res = await fetch(url, { headers: { Accept: 'application/json' } });
+      const data = await res.json().catch(() => null);
+      if (res.ok && Array.isArray(data)) {
+        return data;
+      }
+      lastRes = res;
+      lastData = data;
+    } catch (e) {
+      lastNetworkError = e instanceof Error ? e : new Error(String(e));
     }
-    lastRes = res;
-    lastData = data;
   }
 
-  let msg = `Demand forecast unavailable (HTTP ${lastRes?.status ?? '?'})`;
-  if (
-    lastData &&
-    typeof lastData === 'object' &&
-    typeof lastData.error === 'string'
-  ) {
-    msg = lastData.error;
+  if (lastRes) {
+    let msg = `Demand forecast unavailable (HTTP ${lastRes?.status ?? '?'})`;
+    if (
+      lastData &&
+      typeof lastData === 'object' &&
+      typeof lastData.error === 'string'
+    ) {
+      msg = lastData.error;
+    }
+    const err = new Error(msg);
+    err.status = lastRes?.status;
+    throw err;
   }
 
-  const err = new Error(msg);
-  err.status = lastRes?.status;
+  const baseHint = apiUnreachableMessage();
+  const flaskHint =
+    ' If demand still fails after the API is up, start the ML app: `python app.py` (default port 5001) so Express can reach /forecast.';
+  const err = new Error(
+    `${baseHint}${lastNetworkError && lastNetworkError.message === 'Failed to fetch' ? ' (connection refused or blocked — is `npm start` running in /backend on port 5000?)' : ` (${lastNetworkError?.message || 'network error'})`}${flaskHint}`
+  );
+  err.status = 0;
   throw err;
 }
 

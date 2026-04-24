@@ -14,6 +14,7 @@ import './Dashboard.css';
 import { QRCodeCanvas } from "qrcode.react";
 
 import { API_BASE } from '../config/apiBase';
+import { fetchWithAuth } from '../utils/authFetch';
 import { fetchParkingDemandInsight } from '../utils/parkingDemandHint';
 import {
   CHECK_IN_DEADLINE_MINUTES,
@@ -168,18 +169,21 @@ const UserDashboard = () => {
       totalAmount: Number(r.total_amount) || 0,
       status: r.status,
       createdAt: r.created_at,
-      qrToken: r.qr_token,
       checkInTime: r.check_in_time,
       checkOutTime: r.check_out_time,
       paymentMethod: r.payment_method || 'cash',
+      qrJwt: r.qrJwt || null,
     };
   };
+
+  const bookingQrValue = (reservation) =>
+    (reservation && (reservation.qrJwt || reservation.qr_jwt)) || String(reservation.id);
 
   const loadReservationsAndHistory = async () => {
     if (!user?.id) return;
 
     try {
-      const res = await fetch(`${API_BASE}/reservations/user/${user.id}`);
+      const res = await fetchWithAuth(`${API_BASE}/reservations/user/${user.id}`);
       const data = await res.json();
 
       if (data.ok && Array.isArray(data.reservations)) {
@@ -243,7 +247,7 @@ const UserDashboard = () => {
     }
 
     try {
-      const res = await fetch(`${API_BASE}/reservations`, {
+      const res = await fetchWithAuth(`${API_BASE}/reservations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -357,7 +361,7 @@ const UserDashboard = () => {
     if (!user?.id) return;
     setOverstayActionLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/reservations/${reservationId}/overstay-extend`, {
+      const res = await fetchWithAuth(`${API_BASE}/reservations/${reservationId}/overstay-extend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId: user.id }),
@@ -396,7 +400,7 @@ const UserDashboard = () => {
     if (!ok) return;
 
     try {
-      const res = await fetch(`${API_BASE}/reservations/${id}/cancel`, { method: 'PATCH' });
+      const res = await fetchWithAuth(`${API_BASE}/reservations/${id}/cancel`, { method: 'PATCH' });
       const data = await res.json();
 
       if (!data.ok) {
@@ -525,7 +529,7 @@ const UserDashboard = () => {
           <div className="dashboard-section">
             <h2>Current bookings</h2>
             <p className="parking-overview-hint" style={{ marginBottom: '0.75rem' }}>
-              QR codes contain your <strong>booking ID</strong> only — show at entry (check-in) and exit (check-out).{' '}
+              Parking QR codes are <strong>signed</strong> for security (your booking ID is shown below for reference). Show at entry (check-in) and exit (check-out).{' '}
               After your scheduled start time, the gate must scan you in within{' '}
               <strong>{CHECK_IN_DEADLINE_MINUTES} minutes</strong> or the reservation is cancelled and the spot is
               released. You get a dashboard alert and banner in the last{' '}
@@ -565,7 +569,7 @@ const UserDashboard = () => {
                         <td>{formatEgp(reservation.totalAmount)}</td>
                         <td>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-                            <QRCodeCanvas value={String(reservation.id)} size={90} />
+                            <QRCodeCanvas value={bookingQrValue(reservation)} size={90} />
                             <small>ID: {reservation.id}</small>
                             <button
                               type="button"
@@ -649,7 +653,7 @@ const UserDashboard = () => {
               Pay <strong>{formatEgp(exitQRReservation.totalAmount)}</strong> cash to the gatekeeper. Show this QR for <strong>check-out</strong> — final amount is calculated at exit.
             </p>
             <div className="exit-qr-code-wrap">
-              <QRCodeCanvas value={String(exitQRReservation.id)} size={220} />
+              <QRCodeCanvas value={bookingQrValue(exitQRReservation)} size={220} />
               <p className="exit-qr-instruction" style={{ marginTop: 12 }}>Booking ID: {exitQRReservation.id}</p>
             </div>
             <div className="modal-actions">

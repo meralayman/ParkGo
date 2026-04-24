@@ -8,9 +8,9 @@ const Navbar = ({ showAuthLinks = false, variant = 'default', hideLotDesignerLin
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setMobileOpen(false);
-    logout();
+    await logout();
     navigate('/');
   };
 

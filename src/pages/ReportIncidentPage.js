@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNotifier } from '../context/NotifierContext';
 import Navbar from '../components/Navbar';
 import { apiUrl } from '../config/apiBase';
+import { fetchWithAuth } from '../utils/authFetch';
 import './Dashboard.css';
 
 const ReportIncidentPage = () => {
@@ -62,7 +63,7 @@ const ReportIncidentPage = () => {
       }
       if (photo) formData.append('photo', photo);
 
-      const res = await fetch(apiUrl('/incidents'), {
+      const res = await fetchWithAuth(apiUrl('/incidents'), {
         method: 'POST',
         body: formData,
       });

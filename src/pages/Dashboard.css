@@ -304,6 +304,19 @@
   background: var(--nav-link-hover-bg);
 }
 
+.admin-security-log-action {
+  max-width: min(520px, 55vw);
+  word-break: break-word;
+  vertical-align: top;
+}
+
+.admin-security-log-user {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+  word-break: break-all;
+  max-width: 280px;
+}
+
 .action-buttons {
   display: flex;
   gap: 8px;
