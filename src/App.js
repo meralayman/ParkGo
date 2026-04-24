@@ -31,6 +31,7 @@ function AppRoutes() {
         <Route path="/lot-designer" element={<SmartLayoutDesignerPage />} />
         <Route path="/smart-layout" element={<Navigate to="/lot-designer" replace />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/login/admin" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/payment" element={<ProtectedRoute><PaymentPage /></ProtectedRoute>} />
         <Route path="/payment/return" element={<ProtectedRoute><PaymentReturnPage /></ProtectedRoute>} />

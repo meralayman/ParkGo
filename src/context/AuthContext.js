@@ -24,16 +24,41 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const login = async (usernameOrEmail, password) => {
+  const login = async (usernameOrEmail, password, options = {}) => {
     try {
+      const { intendedRole } = options;
+      const body = { usernameOrEmail, password };
+      if (intendedRole) {
+        body.intendedRole = intendedRole;
+      }
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ usernameOrEmail, password }),
+        body: JSON.stringify(body),
       });
   
-      const data = await res.json();
-  
+      let data = {};
+      try {
+        data = await res.json();
+      } catch {
+        // non-JSON error body
+      }
+
+      if (!res.ok) {
+        const msg =
+          data.error ||
+          (res.status === 401
+            ? "Invalid username/email or password"
+            : "Login failed");
+        return {
+          success: false,
+          error: msg,
+          locked: data.locked === true || res.status === 429,
+          lockoutSeconds: typeof data.lockoutSeconds === "number" ? data.lockoutSeconds : undefined,
+          code: data.code,
+        };
+      }
+
       if (!data.ok) {
         return { success: false, error: data.error || "Invalid username/email or password" };
       }
@@ -86,14 +111,26 @@ export const AuthProvider = ({ children }) => {
   };
   
 
-  const loginWithGoogle = async (credential) => {
+  const loginWithGoogle = async (credential, options = {}) => {
     try {
+      const { intendedRole } = options;
+      const body = { accessToken: credential };
+      if (intendedRole) {
+        body.intendedRole = intendedRole;
+      }
       const res = await fetch(`${API_BASE}/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accessToken: credential }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
+      if (!res.ok) {
+        return {
+          success: false,
+          error: data.error || (res.status === 403 ? "Not authorized" : "Google sign-in failed"),
+          code: data.code,
+        };
+      }
       if (!data.ok) {
         return { success: false, error: data.error || "Google sign-in failed" };
       }

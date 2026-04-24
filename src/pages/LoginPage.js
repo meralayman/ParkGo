@@ -1,9 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useGoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import Navbar from '../components/Navbar';
 import './AuthPages.css';
+
+function formatLockoutRemaining(ms) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
 
 const GmailIcon = () => (
   <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
@@ -19,6 +26,9 @@ const LoginPage = () => {
   const location = useLocation();
   const { login, loginWithGoogle, user } = useAuth();
   const fromSignup = location.state?.fromSignup;
+  /** true when opening /login/admin or redirect from /admin while logged out */
+  const isAdminSignIn =
+    location.pathname === '/login/admin' || location.state?.requireAdmin;
   const [formData, setFormData] = useState({
     usernameOrEmail: '',
     password: ''
@@ -26,12 +36,24 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  /** ms timestamp when password login is allowed again (server lockout) */
+  const [lockoutEnd, setLockoutEnd] = useState(null);
+  const [lockoutLabel, setLockoutLabel] = useState('');
+
+  const isPasswordLocked = lockoutEnd != null && Date.now() < lockoutEnd;
+
+  const locRef = useRef(location);
+  locRef.current = location;
 
   const googleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
       setError('');
-      const result = await loginWithGoogle(tokenResponse.access_token);
+      const wantAdmin =
+        locRef.current.pathname === '/login/admin' || locRef.current.state?.requireAdmin;
+      const result = await loginWithGoogle(tokenResponse.access_token, {
+        intendedRole: wantAdmin ? 'admin' : undefined,
+      });
       if (result.success) {
         const roleRoutes = { admin: '/admin', user: '/user', gatekeeper: '/gatekeeper' };
         navigate(roleRoutes[result.user.role] || '/user');
@@ -43,6 +65,26 @@ const LoginPage = () => {
       setGoogleLoading(false);
     },
   });
+
+  useEffect(() => {
+    if (!lockoutEnd) {
+      setLockoutLabel('');
+      return;
+    }
+    const tick = () => {
+      const left = lockoutEnd - Date.now();
+      if (left <= 0) {
+        setLockoutEnd(null);
+        setLockoutLabel('');
+        setError('');
+        return;
+      }
+      setLockoutLabel(formatLockoutRemaining(left));
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [lockoutEnd]);
 
   useEffect(() => {
     // Redirect if already logged in
@@ -61,11 +103,16 @@ const LoginPage = () => {
       ...formData,
       [e.target.name]: e.target.value
     });
-    setError('');
+    if (!isPasswordLocked) {
+      setError('');
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isPasswordLocked) {
+      return;
+    }
     setError('');
 
     if (!formData.usernameOrEmail || !formData.password) {
@@ -75,7 +122,9 @@ const LoginPage = () => {
 
     setLoading(true);
 
-    const result = await login(formData.usernameOrEmail, formData.password);
+    const result = await login(formData.usernameOrEmail, formData.password, {
+      intendedRole: isAdminSignIn ? 'admin' : undefined,
+    });
 
     setLoading(false);
 
@@ -88,7 +137,16 @@ const LoginPage = () => {
       };
       navigate(roleRoutes[result.user.role] || '/user');
     } else {
-      setError(result.error || 'Invalid username/email or password');
+      const errMsg = result.error || 'Invalid username/email or password';
+      setError(errMsg);
+      if (result.locked) {
+        const sec = typeof result.lockoutSeconds === 'number' && result.lockoutSeconds > 0
+          ? result.lockoutSeconds
+          : 5 * 60;
+        setLockoutEnd(Date.now() + sec * 1000);
+        setLockoutLabel(formatLockoutRemaining(sec * 1000));
+        window.alert(errMsg);
+      }
     }
   };
 
@@ -97,11 +155,25 @@ const LoginPage = () => {
       <Navbar showAuthLinks />
       <div className="auth-container">
       <div className="auth-card">
-        <h2>Welcome Back</h2>
-        <p className="auth-subtitle">Login to your ParkGo account</p>
+        <h2>{isAdminSignIn ? 'Admin sign in' : 'Welcome Back'}</h2>
+        <p className="auth-subtitle">
+          {isAdminSignIn
+            ? 'Administrator access only. Other roles should use the standard login page.'
+            : 'Login to your ParkGo account'}
+        </p>
+        {isAdminSignIn && !location.state?.requireAdmin && (
+          <p className="auth-footer" style={{ marginTop: 8 }}>
+            <Link to="/login">Standard user / gatekeeper login</Link>
+          </p>
+        )}
 
         {fromSignup && <div className="success-message">Account created successfully! Please log in.</div>}
         {error && <div className="error-message">{error}</div>}
+        {isPasswordLocked && lockoutLabel && (
+          <div className="error-message" style={{ marginTop: error ? 8 : 0 }} role="status">
+            Try again in {lockoutLabel} (min:sec)
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
@@ -113,6 +185,7 @@ const LoginPage = () => {
               value={formData.usernameOrEmail}
               onChange={handleChange}
               required
+              disabled={isPasswordLocked}
               placeholder="Enter your username or email"
             />
           </div>
@@ -126,12 +199,13 @@ const LoginPage = () => {
               value={formData.password}
               onChange={handleChange}
               required
+              disabled={isPasswordLocked}
               placeholder="Enter your password"
             />
           </div>
 
-          <button type="submit" className="auth-button" disabled={loading}>
-            {loading ? 'Logging in...' : 'Login'}
+          <button type="submit" className="auth-button" disabled={loading || isPasswordLocked}>
+            {loading ? 'Logging in...' : isPasswordLocked ? 'Temporarily locked' : 'Login'}
           </button>
 
           {process.env.REACT_APP_GOOGLE_CLIENT_ID && (

@@ -37,6 +37,70 @@ const uploadIncidentPhoto = multer({
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+// -------------------- Login lockout (password) — 4 wrong attempts → 5 min block ---------
+const MAX_PASSWORD_FAILS = 4;
+const PASSWORD_LOCKOUT_MS = 5 * 60 * 1000;
+/** @type {Map<string, { failures: number, lockedUntil: number }>} */
+const passwordLoginState = new Map();
+
+function normalizeLoginKey(identifier) {
+  return String(identifier || "")
+    .trim()
+    .toLowerCase();
+}
+
+function lockoutSecondsRemainingForKey(key) {
+  const s = passwordLoginState.get(key);
+  if (!s || !s.lockedUntil) return 0;
+  if (Date.now() >= s.lockedUntil) {
+    passwordLoginState.delete(key);
+    return 0;
+  }
+  return Math.ceil((s.lockedUntil - Date.now()) / 1000);
+}
+
+function isPasswordLoginLocked(key) {
+  return lockoutSecondsRemainingForKey(key) > 0;
+}
+
+function clearPasswordLoginState(key) {
+  passwordLoginState.delete(key);
+}
+
+/** Failed password attempts on **admin sign-in only** (`intendedRole: admin`), per identifier key. */
+/** @type {Map<string, number>} */
+const adminSignInPasswordFails = new Map();
+
+function incrementAdminSignInPasswordFail(key) {
+  const n = (adminSignInPasswordFails.get(key) || 0) + 1;
+  adminSignInPasswordFails.set(key, n);
+  return n;
+}
+
+function clearAdminSignInPasswordFails(key) {
+  adminSignInPasswordFails.delete(key);
+}
+
+/**
+ * Record a failed password for this identifier. On the 4th fail, start 5 min lockout.
+ * Returns the updated state; if locked, caller should respond 429.
+ */
+function recordFailedPasswordLogin(key) {
+  let s = passwordLoginState.get(key);
+  if (s && s.lockedUntil && Date.now() >= s.lockedUntil) {
+    s = { failures: 0, lockedUntil: 0 };
+  } else if (!s) {
+    s = { failures: 0, lockedUntil: 0 };
+  }
+  s.failures += 1;
+  if (s.failures >= MAX_PASSWORD_FAILS) {
+    s.lockedUntil = Date.now() + PASSWORD_LOCKOUT_MS;
+    s.failures = 0;
+  }
+  passwordLoginState.set(key, s);
+  return s;
+}
+
 // -------------------- PAYMOB (Visa/Mastercard) --------------------
 // Safe to register even if env isn't set; frontend will detect via /paymob/config
 try {
@@ -106,6 +170,24 @@ app.get("/api/forecast", async (req, res) => {
     res.status(503).json({
       ok: false,
       error: "Demand forecast service unavailable. Start the Flask app (app.py).",
+    });
+  }
+});
+
+app.post("/api/intrusion-detect", async (req, res) => {
+  try {
+    const upstream = await fetch(`${DEMAND_ML_URL}/intrusion/detect`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(req.body ?? {}),
+    });
+    const data = await upstream.json();
+    res.status(upstream.status).json(data);
+  } catch (err) {
+    console.error("[ParkGo] /api/intrusion-detect → Flask:", err?.message || err);
+    res.status(503).json({
+      ok: false,
+      error: "Intrusion detection service unavailable. Start the Flask app (app.py).",
     });
   }
 });
@@ -250,6 +332,7 @@ app.get("/", (req, res) => {
     demandMl: {
       predict: "POST /api/predict-demand → Flask /predict",
       forecast: "GET /api/forecast → Flask /forecast",
+      intrusion: "POST /api/intrusion-detect → Flask /intrusion/detect",
     },
   });
 });
@@ -321,6 +404,102 @@ async function ensureIncidentReportsTable() {
   } catch (e) {
     console.warn("[ParkGo] incident_reports ensure (non-fatal):", e?.message || e);
   }
+}
+
+async function ensureSecurityAlertsTable() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS security_alerts (
+        id SERIAL PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        alert_type VARCHAR(64) NOT NULL,
+        message TEXT NOT NULL,
+        details JSONB
+      );
+    `);
+    await pool.query(
+      `CREATE INDEX IF NOT EXISTS idx_security_alerts_created ON security_alerts(created_at DESC);`
+    );
+  } catch (e) {
+    console.warn("[ParkGo] security_alerts ensure (non-fatal):", e?.message || e);
+  }
+}
+
+function getClientIp(req) {
+  const xff = req.headers["x-forwarded-for"];
+  if (xff) {
+    const first = String(xff).split(",")[0].trim();
+    if (first) return first;
+  }
+  return (req.socket && req.socket.remoteAddress) || "";
+}
+
+/**
+ * A non-admin successfully authenticated (password or Google) but used an "admin" sign-in flow.
+ * Records DB alert and logs — real admins are notified in the dashboard via GET /admin/security-alerts.
+ */
+async function recordNonAdminAdminLoginAttempt(req, user) {
+  const ip = getClientIp(req);
+  const ua = req.get ? req.get("user-agent") : req.headers["user-agent"] || "";
+  const role = user.role != null ? user.role : "unknown";
+  const unregistered = user.id == null;
+  const message = unregistered
+    ? `Unregistered Google account attempted admin sign-in: ${user.email || "unknown"}. ` +
+        `IP: ${ip || "unknown"}.`
+    : `Non-admin attempted admin sign-in: @${user.username} (${user.email}) — ` +
+        `account role: ${role}. IP: ${ip || "unknown"}.`;
+  const details = {
+    userId: user.id != null ? user.id : null,
+    username: user.username,
+    email: user.email,
+    accountRole: role,
+    clientIp: ip,
+    userAgent: ua,
+  };
+  try {
+    await ensureSecurityAlertsTable();
+    await pool.query(
+      `INSERT INTO security_alerts (alert_type, message, details) VALUES ($1, $2, $3::jsonb)`,
+      ["admin_access_attempt", message, JSON.stringify(details)]
+    );
+    console.warn(`[Security] ${message}`);
+  } catch (e) {
+    console.error("[Security] failed to store alert:", e?.message || e);
+  }
+}
+
+/** Four wrong passwords on the admin sign-in page for the same identifier (password flow only). */
+async function recordAdminSignInBruteForceAttempt(req, identifierForDisplay) {
+  const ip = getClientIp(req);
+  const ua = req.get ? req.get("user-agent") : req.headers["user-agent"] || "";
+  const message =
+    `Admin sign-in: 4 failed password attempts for "${identifierForDisplay}". ` +
+    `Possible unauthorized access to the admin login. IP: ${ip || "unknown"}.`;
+  const details = {
+    identifier: identifierForDisplay,
+    clientIp: ip,
+    userAgent: ua,
+  };
+  try {
+    await ensureSecurityAlertsTable();
+    await pool.query(
+      `INSERT INTO security_alerts (alert_type, message, details) VALUES ($1, $2, $3::jsonb)`,
+      ["admin_signin_bruteforce", message, JSON.stringify(details)]
+    );
+    console.warn(`[Security] ${message}`);
+  } catch (e) {
+    console.error("[Security] failed to store brute-force alert:", e?.message || e);
+  }
+}
+
+async function assertRequestingUserIsAdmin(userId) {
+  if (userId === undefined || userId === null || String(userId).trim() === "") {
+    return null;
+  }
+  const r = await pool.query("SELECT id, role FROM users WHERE id = $1", [userId]);
+  if (r.rowCount === 0) return null;
+  if (r.rows[0].role !== "admin") return null;
+  return r.rows[0];
 }
 
 /**
@@ -518,10 +697,21 @@ app.post("/auth/signup", async (req, res) => {
 
 app.post("/auth/login", async (req, res) => {
   try {
-    const { email, usernameOrEmail, password } = req.body;
+    const { email, usernameOrEmail, password, intendedRole: rawIntended } = req.body;
+    const wantAdmin = String(rawIntended || "").toLowerCase() === "admin";
     const identifier = usernameOrEmail || email;
     if (!identifier || !password) {
       return res.status(400).json({ ok: false, error: "Username/email and password are required" });
+    }
+
+    const key = normalizeLoginKey(identifier);
+    if (isPasswordLoginLocked(key)) {
+      return res.status(429).json({
+        ok: false,
+        locked: true,
+        error: "Too many failed login attempts. Try again in 5 minutes.",
+        lockoutSeconds: lockoutSecondsRemainingForKey(key),
+      });
     }
 
     const r = await pool.query(
@@ -530,16 +720,61 @@ app.post("/auth/login", async (req, res) => {
     );
 
     if (r.rowCount === 0) {
+      const st = recordFailedPasswordLogin(key);
+      if (wantAdmin) {
+        const adminN = incrementAdminSignInPasswordFail(key);
+        if (adminN >= 4) {
+          clearAdminSignInPasswordFails(key);
+          await recordAdminSignInBruteForceAttempt(req, String(identifier).trim());
+        }
+      }
+      if (st.lockedUntil && Date.now() < st.lockedUntil) {
+        return res.status(429).json({
+          ok: false,
+          locked: true,
+          error:
+            "Too many failed login attempts. Your account is temporarily locked. Try again in 5 minutes.",
+          lockoutSeconds: lockoutSecondsRemainingForKey(key),
+        });
+      }
       return res.status(401).json({ ok: false, error: "Invalid credentials" });
     }
 
     const user = r.rows[0];
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
+      const st = recordFailedPasswordLogin(key);
+      if (wantAdmin) {
+        const adminN = incrementAdminSignInPasswordFail(key);
+        if (adminN >= 4) {
+          clearAdminSignInPasswordFails(key);
+          await recordAdminSignInBruteForceAttempt(req, String(identifier).trim());
+        }
+      }
+      if (st.lockedUntil && Date.now() < st.lockedUntil) {
+        return res.status(429).json({
+          ok: false,
+          locked: true,
+          error:
+            "Too many failed login attempts. Your account is temporarily locked. Try again in 5 minutes.",
+          lockoutSeconds: lockoutSecondsRemainingForKey(key),
+        });
+      }
       return res.status(401).json({ ok: false, error: "Invalid credentials" });
     }
 
+    clearPasswordLoginState(key);
+    clearAdminSignInPasswordFails(key);
     delete user.password_hash;
+    if (wantAdmin && user.role !== "admin") {
+      await recordNonAdminAdminLoginAttempt(req, user);
+      return res.status(403).json({
+        ok: false,
+        code: "NOT_ADMIN",
+        error:
+          "This account is not an administrator. If you are a user or gatekeeper, use the standard login (not the admin sign-in).",
+      });
+    }
     res.json({ ok: true, user });
   } catch (err) {
     res.status(500).json({ ok: false, error: apiError(err) });
@@ -548,7 +783,8 @@ app.post("/auth/login", async (req, res) => {
 
 app.post("/auth/google", async (req, res) => {
   try {
-    const { accessToken } = req.body;
+    const { accessToken, intendedRole: rawIntended } = req.body;
+    const wantAdmin = String(rawIntended || "").toLowerCase() === "admin";
     if (!accessToken) {
       return res.status(400).json({ ok: false, error: "Google access token is required" });
     }
@@ -566,7 +802,31 @@ app.post("/auth/google", async (req, res) => {
     );
     if (r.rowCount > 0) {
       const user = r.rows[0];
+      if (wantAdmin && user.role !== "admin") {
+        await recordNonAdminAdminLoginAttempt(req, user);
+        return res.status(403).json({
+          ok: false,
+          code: "NOT_ADMIN",
+          error:
+            "This account is not an administrator. If you are a user or gatekeeper, use the standard login (not the admin sign-in).",
+        });
+      }
       return res.json({ ok: true, user });
+    }
+    if (wantAdmin) {
+      const baseU = (email.split("@")[0] || "user").replace(/\W/g, "").slice(0, 20);
+      await recordNonAdminAdminLoginAttempt(req, {
+        id: null,
+        username: baseU,
+        email,
+        role: "unregistered",
+      });
+      return res.status(403).json({
+        ok: false,
+        code: "NOT_ADMIN",
+        error:
+          "This account is not an administrator. If you are a user or gatekeeper, use the standard login (not the admin sign-in).",
+      });
     }
     const baseUsername = (email.split("@")[0] || "user").replace(/\W/g, "").slice(0, 20);
     let username = baseUsername;
@@ -583,7 +843,7 @@ app.post("/auth/google", async (req, res) => {
        RETURNING id, first_name, last_name, username, email, role`,
       [given_name || "User", family_name || "", username, email, passwordHash]
     );
-    res.json({ ok: true, user: insert.rows[0] });
+    return res.json({ ok: true, user: insert.rows[0] });
   } catch (err) {
     res.status(500).json({ ok: false, error: apiError(err) });
   }
@@ -722,6 +982,28 @@ app.get("/admin/users", async (req, res) => {
        ORDER BY created_at DESC`
     );
     res.json({ ok: true, users: r.rows });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: apiError(err) });
+  }
+});
+
+app.get("/admin/security-alerts", async (req, res) => {
+  try {
+    const admin = await assertRequestingUserIsAdmin(req.query.userId);
+    if (!admin) {
+      return res.status(403).json({ ok: false, error: "Admin access only" });
+    }
+    const afterId = Math.max(0, parseInt(String(req.query.afterId || "0"), 10) || 0);
+    await ensureSecurityAlertsTable();
+    const r = await pool.query(
+      `SELECT id, created_at, alert_type, message, details
+       FROM security_alerts
+       WHERE id > $1
+       ORDER BY id ASC
+       LIMIT 100`,
+      [afterId]
+    );
+    return res.json({ ok: true, alerts: r.rows });
   } catch (err) {
     res.status(500).json({ ok: false, error: apiError(err) });
   }
@@ -1474,6 +1756,11 @@ app.listen(PORT, async () => {
     await ensureIncidentReportsTable();
   } catch (e) {
     console.error("[ParkGo] incident_reports table:", e?.message || e);
+  }
+  try {
+    await ensureSecurityAlertsTable();
+  } catch (e) {
+    console.error("[ParkGo] security_alerts table:", e?.message || e);
   }
   await ensureAdmin();
   await ensureGatekeeper();

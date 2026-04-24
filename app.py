@@ -1,5 +1,5 @@
 """
-Flask API for parking demand predictions (train_model pipeline).
+Flask API for parking demand predictions + intrusion detection.
 """
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from datetime import datetime
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+from intrusion_detection import detect_intrusion_event
 from train_model import load_inference_bundle, predict_demand, predict_next_6_hours
 
 app = Flask(__name__)
@@ -111,6 +112,31 @@ def forecast():
         )
         return jsonify(rows), 200
 
+    except Exception:
+        traceback.print_exc()
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@app.route("/intrusion/detect", methods=["POST"])
+def intrusion_detect():
+    """
+    Lightweight intrusion detection endpoint.
+
+    Expected JSON body keys (all optional, numeric >= 0):
+      failed_logins, requests_per_minute, unique_ips,
+      payload_size_kb, sensitive_path_accesses, geo_velocity_kmh
+    """
+    try:
+        data = request.get_json(force=True, silent=True)
+        if data is None:
+            return jsonify({"error": "Expected JSON object body"}), 400
+        if not isinstance(data, dict):
+            return jsonify({"error": "Expected JSON object body"}), 400
+
+        result = detect_intrusion_event(data)
+        return jsonify(result), 200
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
     except Exception:
         traceback.print_exc()
         return jsonify({"error": "Internal server error"}), 500

@@ -10,6 +10,50 @@ import { API_BASE, safeFetchJson } from '../config/apiBase';
 const AdminDashboard = () => {
   const { user } = useAuth();
   const { toast, confirm: openConfirmDialog } = useNotifier();
+
+  useEffect(() => {
+    if (!user || user.role !== 'admin') {
+      return;
+    }
+    const initKey = 'parkgo_security_alerts_inited';
+    const idKey = 'parkgo_security_alert_max_id';
+    const poll = async () => {
+      const afterId = Math.max(0, parseInt(localStorage.getItem(idKey) || '0', 10) || 0);
+      try {
+        const res = await fetch(
+          `${API_BASE}/admin/security-alerts?userId=${encodeURIComponent(
+            user.id
+          )}&afterId=${afterId}`
+        );
+        const data = await res.json();
+        if (!res.ok || !data.ok) return;
+        const alerts = data.alerts || [];
+        if (alerts.length === 0) return;
+        const max = Math.max(...alerts.map((a) => a.id));
+        if (!localStorage.getItem(initKey)) {
+          localStorage.setItem(initKey, '1');
+          localStorage.setItem(idKey, String(max));
+          return;
+        }
+        localStorage.setItem(idKey, String(max));
+        if (alerts.length === 1) {
+          toast(`Security: ${alerts[0].message}`, { variant: 'warning', duration: 12_000 });
+        } else {
+          toast(
+            `Security: ${alerts.length} new alert(s). Latest: ${
+              alerts[alerts.length - 1].message
+            }`,
+            { variant: 'warning', duration: 14_000 }
+          );
+        }
+      } catch {
+        /* non-fatal */
+      }
+    };
+    poll();
+    const t = setInterval(poll, 30_000);
+    return () => clearInterval(t);
+  }, [user, toast]);
   const [activeSection, setActiveSection] = useState('analytics');
   const [accounts, setAccounts] = useState([]);
   const [accountsLoading, setAccountsLoading] = useState(false);

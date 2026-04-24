@@ -1,16 +1,23 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const ProtectedRoute = ({ children, role }) => {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return <div className="loading">Loading...</div>;
   }
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return (
+      <Navigate
+        to={role === 'admin' ? '/login/admin' : '/login'}
+        replace
+        state={{ from: location, requireAdmin: role === 'admin' }}
+      />
+    );
   }
 
   if (role && user.role !== role) {
