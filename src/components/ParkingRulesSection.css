@@ -9,7 +9,8 @@
   align-items: stretch;
   margin: 0 0 1.35rem 0;
   border-radius: 12px;
-  overflow: hidden;
+  /* Visible: overflow:hidden clipped multiple <li> rows in some WebKit/Chromium modal stacks */
+  overflow: visible;
   border: 2px solid rgba(96, 165, 250, 0.85);
   box-shadow:
     0 0 0 1px rgba(15, 23, 42, 0.9),
@@ -41,21 +42,31 @@
   border-bottom: 2px solid rgba(96, 165, 250, 0.45);
 }
 
-.parking-rules-modal-box__list {
+.parking-rules-modal-box__rules {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
   margin: 0;
-  padding-left: 1.3rem;
+}
+
+.parking-rules-modal-box__rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
   color: #e2e8f0;
   font-size: 0.9375rem;
-  line-height: 1.65;
+  line-height: 1.6;
   font-weight: 600;
 }
 
-.parking-rules-modal-box__list li {
-  margin-bottom: 0.45rem;
+.parking-rules-modal-box__rule-marker {
+  flex-shrink: 0;
+  color: #94a3b8;
 }
 
-.parking-rules-modal-box__list li:last-child {
-  margin-bottom: 0;
+.parking-rules-modal-box__rule-text {
+  flex: 1;
+  min-width: 0;
 }
 
 /* User dashboard — matches .dashboard-section rhythm */
@@ -63,18 +74,27 @@
   margin-bottom: 30px;
 }
 
-.parking-rules-section__list {
+.parking-rules-section__rules {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
   margin: 0;
-  padding-left: 1.35rem;
+}
+
+.parking-rules-section__rule {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
   color: var(--text-muted);
   font-size: 0.9375rem;
   line-height: 1.55;
 }
 
-.parking-rules-section__list li {
-  margin-bottom: 0.45rem;
+.parking-rules-section__rule-marker {
+  flex-shrink: 0;
+  color: var(--text-muted);
 }
 
-.parking-rules-section__list li:last-child {
-  margin-bottom: 0;
+.parking-rules-section__rule-text {
+  flex: 1;
 }

@@ -20,12 +20,11 @@ import {
   CHECK_IN_DEADLINE_MINUTES,
   CHECK_IN_WARNING_LEAD_MINUTES,
 } from '../constants/checkInDeadline';
+import { tieredBookingTotalEgp, extraHourChargeEgp } from '../utils/parkingPricing';
 
-/** Match backend PARKING_HOURLY_RATE (extend button) */
-const HOURLY_RATE = 5;
-/** Match backend OVERSTAY_HOURLY_RATE — shown for past-end-time text; set REACT_APP_OVERSTAY_HOURLY_RATE if you override it */
+/** Match backend overstay / extend extra-per-hour; set REACT_APP_OVERSTAY_HOURLY_RATE to override display. */
 const OVERSTAY_RATE_DISPLAY =
-  Number(process.env.REACT_APP_OVERSTAY_HOURLY_RATE) || HOURLY_RATE;
+  Number(process.env.REACT_APP_OVERSTAY_HOURLY_RATE) || extraHourChargeEgp();
 
 const UserDashboard = () => {
   const navigate = useNavigate();
@@ -49,6 +48,13 @@ const UserDashboard = () => {
     vehicleType: 'car',
     paymentMethod: 'cash'
   });
+
+  /** Tiered estimate shown in modal (matches backend tariff: first hour + extra hours). */
+  const reservationModalEstimateEgp = useMemo(() => {
+    const raw = parseFloat(String(reservationData.duration).trim(), 10);
+    const hours = Number.isFinite(raw) && raw > 0 ? raw : 1;
+    return tieredBookingTotalEgp(hours);
+  }, [reservationData.duration]);
 
   /** Slot chosen on the public map or here; kept in localStorage across login */
   const [pendingSlotNo, setPendingSlotNo] = useState(null);
@@ -216,9 +222,8 @@ const UserDashboard = () => {
     }
 
     const duration = parseFloat(reservationData.duration) || 1;
-    const totalAmount = duration * 5;
-
     const startTime = new Date(`${reservationData.date}T${reservationData.time}`);
+    const totalAmount = tieredBookingTotalEgp(duration, startTime);
     const endTime = new Date(startTime.getTime() + duration * 60 * 60 * 1000);
 
     const isCard = reservationData.paymentMethod === 'card';
@@ -461,7 +466,7 @@ const UserDashboard = () => {
                     disabled={overstayActionLoading}
                     onClick={() => handleOverstayExtend(ov.id)}
                   >
-                    {`Add 1 more hour (+${HOURLY_RATE.toFixed(2)} EGP)`}
+                    {`Add 1 more hour (+${extraHourChargeEgp().toFixed(2)} EGP)`}
                   </button>
                 </div>
               </div>
@@ -708,8 +713,9 @@ const UserDashboard = () => {
 
               <div className="form-row">
                 <div className="form-group">
-                  <label>Duration (hours) *</label>
+                  <label htmlFor="reservation-duration-input">Duration (hours) *</label>
                   <input
+                    id="reservation-duration-input"
                     type="number"
                     name="duration"
                     value={reservationData.duration}
@@ -749,13 +755,14 @@ const UserDashboard = () => {
                 </div>
 
                 <div className="form-group">
-                  <label>Total Amount</label>
-                  <input
-                    type="text"
-                    value={formatEgp((parseFloat(reservationData.duration) || 0) * 5)}
-                    disabled
-                    style={{ background: '#f5f5f5' }}
-                  />
+                  <label htmlFor="reservation-total-estimate">Total Amount</label>
+                  <output
+                    id="reservation-total-estimate"
+                    className="reservation-total-amount-display"
+                    htmlFor="reservation-duration-input"
+                  >
+                    {formatEgp(reservationModalEstimateEgp)}
+                  </output>
                 </div>
               </div>
 

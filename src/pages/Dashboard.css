@@ -719,6 +719,25 @@
   box-shadow: 0 0 0 3px var(--glow-blue);
 }
 
+/* Estimated tariff — readable on any theme (replaces problematic disabled inputs) */
+.modal-content output.reservation-total-amount-display {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  background: linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%);
+  color: #0f172a;
+  -webkit-text-fill-color: #0f172a;
+}
+
 .report-incident-page .modal-content {
   max-width: 640px;
   margin: 0 auto;

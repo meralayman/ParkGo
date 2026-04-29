@@ -17,8 +17,20 @@ const {
   verifyBookingQrDetailed,
   ensureBookingQrColumns,
 } = require("./qrJwt");
-const { computeQuote, ensureDynamicHourlyRateColumn } = require("./smartParking");
+const {
+  computeQuote,
+  ensureDynamicHourlyRateColumn,
+  peakInfo,
+  getParkingSuggestions,
+} = require("./smartParking");
 const { logAudit, ensureAuditLogsTable, clientIp } = require("./auditLog");
+const {
+  tieredBookingTotalEgp,
+  billableHoursFromDurationHours,
+  effectiveAverageHourlyEgp,
+  firstHourEgpForPeakLevel,
+  EXTRA_PER_HOUR_EGP,
+} = require("./parkingPricing");
 
 const app = express();
 if (process.env.TRUST_PROXY === "1") {
@@ -193,10 +205,8 @@ app.post("/api/intrusion-detect", async (req, res) => {
   }
 });
 
-/** EGP per hour — new bookings and voluntary “add 1 hour” */
-const PARKING_HOURLY_RATE = Number(process.env.PARKING_HOURLY_RATE) || 5;
-/** EGP per hour for staying past end_time without extending — legacy fallback if `dynamic_hourly_rate` is not stored on the booking. */
-const OVERSTAY_HOURLY_RATE = Number(process.env.OVERSTAY_HOURLY_RATE) || PARKING_HOURLY_RATE;
+/** EGP per additional hour beyond the first billed hour (tiered tariff) — overstay extend and late fee fallback when `dynamic_hourly_rate` is missing. */
+const OVERSTAY_HOURLY_RATE = Number(process.env.OVERSTAY_HOURLY_RATE) || EXTRA_PER_HOUR_EGP();
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 
@@ -211,12 +221,7 @@ function storedDynamicHourly(row) {
   return null;
 }
 
-/** In-session rate: `dynamic_hourly_rate` from booking, else `PARKING_HOURLY_RATE`. */
-function baseParkingHourlyRate(row) {
-  return storedDynamicHourly(row) ?? PARKING_HOURLY_RATE;
-}
-
-/** After scheduled end: `dynamic_hourly_rate` when stored, else `OVERSTAY_HOURLY_RATE` (penalty / legacy). */
+/** After scheduled end: `dynamic_hourly_rate` when stored, else `OVERSTAY_HOURLY_RATE` (extra-per-hour tariff). */
 function lateOverstayHourlyRate(row) {
   return storedDynamicHourly(row) ?? OVERSTAY_HOURLY_RATE;
 }
@@ -224,20 +229,24 @@ function lateOverstayHourlyRate(row) {
 /**
  * On checkout: base bill for time from check-in to min(check-out, scheduled end) only;
  * late fee for time after scheduled end (separate, no double-counting).
+ * Base parking uses tiered pricing (first billed hour + extra per hour); late/overstay remains per elapsed hour × late rate.
  * @returns {{ baseAmount: number, baseHours: number, lateFeeAmount: number, lateHours: number, lateFeeApplied: boolean, totalAmount: number, dynamicHourlyRate: number | null, baseHourlyRate: number, lateHourlyRate: number }}
  */
 function computeCheckoutAmounts(row, checkOutAt) {
   const ci = new Date(row.check_in_time);
   const end = new Date(row.end_time);
   const co = new Date(checkOutAt);
-  const baseHr = baseParkingHourlyRate(row);
   const lateHr = lateOverstayHourlyRate(row);
   const dyn = storedDynamicHourly(row);
 
   const endBoundaryMs = Math.min(co.getTime(), end.getTime());
   const spanMs = Math.max(0, endBoundaryMs - ci.getTime());
-  const baseHours = Math.max(1, Math.ceil(spanMs / MS_PER_HOUR));
-  const baseAmount = roundMoney(baseHours * baseHr);
+  const baseDurationHours = spanMs / MS_PER_HOUR;
+  const baseHours = billableHoursFromDurationHours(baseDurationHours);
+  const peakForTariff = peakInfo(new Date(row.start_time));
+  const firstHrEgp = firstHourEgpForPeakLevel(peakForTariff.peakLevel);
+  const baseAmount = tieredBookingTotalEgp(baseDurationHours, firstHrEgp);
+  const baseHrDisplay = effectiveAverageHourlyEgp(baseDurationHours, firstHrEgp);
 
   let lateHours = 0;
   let lateFeeAmount = 0;
@@ -255,7 +264,7 @@ function computeCheckoutAmounts(row, checkOutAt) {
     lateFeeApplied: lateFeeAmount > 0,
     totalAmount: roundMoney(baseAmount + lateFeeAmount),
     dynamicHourlyRate: dyn,
-    baseHourlyRate: baseHr,
+    baseHourlyRate: baseHrDisplay,
     lateHourlyRate: lateHr,
   };
 }
@@ -415,8 +424,29 @@ app.get("/", (req, res) => {
       forecast: "GET /api/forecast → Flask /forecast",
       intrusion: "POST /api/intrusion-detect → Flask /intrusion/detect",
     },
+    parking: {
+      recommendations:
+        "GET /api/parking/recommendations?lat=&lng=&at=ISO8601 (aliases: GET /api/smart-recommendations?… — same handler)",
+    },
   });
 });
+
+/**
+ * Smart parking: ranked lots blending live slot availability (when applicable), proximity to lat/lng,
+ * and Cairo timezone peak-hour indicative pricing. Query: optional `lat`, `lng`, optional `at` (ISO 8601 arrival time).
+ */
+async function sendSmartParkingRecommendations(req, res) {
+  try {
+    const data = await getParkingSuggestions(pool, req.query ?? {});
+    res.json({ ok: true, ...data });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: apiError(err) });
+  }
+}
+
+app.get("/api/parking/recommendations", sendSmartParkingRecommendations);
+/** Shorter alias (same behaviour) — some proxies/stacks mis-handle deep `/api/parking/*` paths. */
+app.get("/api/smart-recommendations", sendSmartParkingRecommendations);
 
 /* -------------------- HEALTH -------------------- */
 app.get("/health", async (req, res) => {
@@ -916,12 +946,24 @@ app.get("/slots", async (req, res) => {
 app.post("/reservations", bookingRateLimiter, async (req, res) => {
   const client = await pool.connect();
   try {
-    const { userId, startTime, endTime, totalAmount, paymentMethod, slotNo: bodySlotNo, slot_no } = req.body;
+    const { userId, startTime, endTime, paymentMethod, slotNo: bodySlotNo, slot_no } = req.body;
     const requestedSlot = (bodySlotNo || slot_no || "").toString().trim();
 
     if (!userId || !startTime || !endTime) {
       return res.status(400).json({ ok: false, error: "Missing required fields" });
     }
+
+    const startDt = new Date(startTime);
+    const endDt = new Date(endTime);
+    if (Number.isNaN(startDt.getTime()) || Number.isNaN(endDt.getTime()) || endDt <= startDt) {
+      return res.status(400).json({ ok: false, error: "Invalid start or end time" });
+    }
+    const bookingDurationHours = (endDt.getTime() - startDt.getTime()) / MS_PER_HOUR;
+    const peakAtStart = peakInfo(startDt);
+    const serverTotalAmount = tieredBookingTotalEgp(
+      bookingDurationHours,
+      firstHourEgpForPeakLevel(peakAtStart.peakLevel)
+    );
 
     await client.query("BEGIN");
     await sweepNoShows(client);
@@ -960,6 +1002,8 @@ app.post("/reservations", bookingRateLimiter, async (req, res) => {
 
     const reservedSlotNo = slotRes.rows[0].slot_no;
     const qrExpiresAt = computeQrExpiresAt(endTime);
+    /** Unique jti stored for legacy JWT verification paths; satisfies NOT NULL on `qr_token` if enforced. */
+    const qrTokenJti = crypto.randomBytes(32).toString("hex");
 
     let dynamicHourly = null;
     try {
@@ -982,8 +1026,8 @@ app.post("/reservations", bookingRateLimiter, async (req, res) => {
         startTime,
         endTime,
         paymentMethod || null,
-        totalAmount || 0,
-        null,
+        serverTotalAmount,
+        qrTokenJti,
         qrExpiresAt,
         dynamicHourly,
       ]
@@ -1559,15 +1603,16 @@ app.post("/reservations/:id/overstay-extend", async (req, res) => {
            total_amount = COALESCE(total_amount, 0) + $1
        WHERE id = $2
        RETURNING *`,
-      [PARKING_HOURLY_RATE, id]
+      [EXTRA_PER_HOUR_EGP(), id]
     );
 
     await client.query("COMMIT");
+    const addAmt = EXTRA_PER_HOUR_EGP();
     return res.json({
       ok: true,
       reservation: up.rows[0],
-      addedAmount: PARKING_HOURLY_RATE,
-      message: `Added 1 hour. +${PARKING_HOURLY_RATE.toFixed(2)} EGP to your total.`,
+      addedAmount: addAmt,
+      message: `Added 1 hour. +${addAmt.toFixed(2)} EGP to your total.`,
     });
   } catch (err) {
     await client.query("ROLLBACK");
@@ -1880,8 +1925,7 @@ app.post("/gate/check-out", async (req, res) => {
            check_out_time = NOW(),
            total_amount = $1,
            late_fee_applied = $2,
-           late_fee_amount = $3,
-           qr_token = NULL
+           late_fee_amount = $3
        WHERE id = $4`,
       [totalAmount, lateFeeApplied, lateFeeAmount, bookingId]
     );
@@ -2031,6 +2075,7 @@ app.listen(PORT, async () => {
     runSweepNoShows();
   }, MISSED_CHECKIN_SWEEP_MS);
   console.log(
-    `API running on http://localhost:${PORT} (check-in deadline after start: ${ARRIVAL_WINDOW_MINUTES} min, sweep every ${MISSED_CHECKIN_SWEEP_MS / 1000}s)`
+    `API running on http://localhost:${PORT} (check-in deadline after start: ${ARRIVAL_WINDOW_MINUTES} min, sweep every ${MISSED_CHECKIN_SWEEP_MS / 1000}s)\n` +
+      `[ParkGo] Smart parking: GET /api/smart-recommendations and GET /api/parking/recommendations (restart backend after git pull if the UI shows HTTP 404)`
   );
 });

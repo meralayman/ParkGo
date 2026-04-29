@@ -1,7 +1,11 @@
 import React from 'react';
 import './ParkingRulesSection.css';
 
-const RULES = ['No double parking', 'Follow time limits', 'Keep QR ready'];
+const RULES = [
+  'No double parking',
+  'Keep QR ready',
+  'Follow time limits',
+];
 
 /**
  * @param {{ variant?: 'dashboard' | 'modal' }} props
@@ -21,11 +25,16 @@ export default function ParkingRulesSection({ variant = 'dashboard' }) {
           <h3 id={headingId} className="parking-rules-modal-box__title">
             Parking Rules
           </h3>
-          <ul className="parking-rules-modal-box__list">
+          <div className="parking-rules-modal-box__rules" role="list">
             {RULES.map((text) => (
-              <li key={text}>{text}</li>
+              <div key={text} className="parking-rules-modal-box__rule" role="listitem">
+                <span aria-hidden className="parking-rules-modal-box__rule-marker">
+                  •
+                </span>
+                <span className="parking-rules-modal-box__rule-text">{text}</span>
+              </div>
             ))}
-          </ul>
+          </div>
         </div>
       </div>
     );
@@ -37,11 +46,16 @@ export default function ParkingRulesSection({ variant = 'dashboard' }) {
       aria-labelledby={headingId}
     >
       <h2 id={headingId}>Parking Rules</h2>
-      <ul className="parking-rules-section__list">
+      <div className="parking-rules-section__rules" role="list">
         {RULES.map((text) => (
-          <li key={text}>{text}</li>
+          <div key={text} className="parking-rules-section__rule" role="listitem">
+            <span aria-hidden className="parking-rules-section__rule-marker">
+              •
+            </span>
+            <span className="parking-rules-section__rule-text">{text}</span>
+          </div>
         ))}
-      </ul>
+      </div>
     </section>
   );
 }
