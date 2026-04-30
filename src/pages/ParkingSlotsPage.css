@@ -130,7 +130,11 @@
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  transition:
+    transform 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.25s ease,
+    border-color 0.2s ease,
+    filter 0.2s ease;
 }
 
 .parking-slot.available {
@@ -139,10 +143,17 @@
   color: #6ee7b7;
 }
 
-.parking-slot.available:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+.parking-slot.available:hover:not(:disabled) {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow:
+    0 6px 16px rgba(16, 185, 129, 0.32),
+    0 2px 6px rgba(0, 0, 0, 0.2);
   border-color: var(--success);
+}
+
+.parking-slot.available:active:not(:disabled) {
+  transform: translateY(-1px) scale(0.98);
+  transition-duration: 0.12s;
 }
 
 .parking-slot.occupied {
@@ -161,10 +172,23 @@
 }
 
 .parking-slot.selected {
-  background: rgba(37, 99, 235, 0.2);
-  border-color: var(--accent-blue);
-  color: var(--logo-blue-light);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.3);
+  position: relative;
+  z-index: 2;
+  background:
+    radial-gradient(circle at 50% -20%, rgba(96, 165, 250, 0.45), transparent 55%),
+    rgba(37, 99, 235, 0.28);
+  border-color: #60a5fa;
+  color: #e0f2fe;
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.55),
+    0 0 28px rgba(37, 99, 235, 0.55),
+    0 8px 20px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transform: scale(1.04);
+}
+
+.parking-slot.available.selected:hover:not(:disabled) {
+  transform: translateY(-2px) scale(1.05);
 }
 
 .parking-slots-actions {

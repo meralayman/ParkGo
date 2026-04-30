@@ -5,15 +5,6 @@ import { fetchParkingDemandInsight } from '../utils/parkingDemandHint';
 import { buildForecastTrendLine } from '../utils/forecastTrend';
 import './SmartParkingAssistant.css';
 
-function defaultAdviceDateTime() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const hh = String(d.getHours()).padStart(2, '0');
-  return { date: `${yyyy}-${mm}-${dd}`, time: `${hh}:00` };
-}
-
 function badgeClass(labelColor) {
   const c = String(labelColor || '').toLowerCase();
   if (c === 'green') return 'spa-badge spa-badge--green';
@@ -56,16 +47,20 @@ function ForecastCard({ row, variant = 'default' }) {
 }
 
 /**
- * Official dashboard block: current demand, 6-hour forecast, booking advice preview.
+ * @param {{ schedulingReady?: boolean, reservationDate?: string, reservationTime?: string }} props
+ * Parent should mount this only after date + time are set; if `schedulingReady` is false, renders nothing.
  */
-export default function SmartParkingAssistant() {
+export default function SmartParkingAssistant({
+  schedulingReady = false,
+  reservationDate = '',
+  reservationTime = '',
+}) {
   const [forecastItems, setForecastItems] = useState([]);
   const [forecastLoading, setForecastLoading] = useState(true);
   const [forecastError, setForecastError] = useState(null);
 
-  const [adviceForm, setAdviceForm] = useState(() => defaultAdviceDateTime());
-  const [adviceInsight, setAdviceInsight] = useState(null);
-  const [adviceLoading, setAdviceLoading] = useState(false);
+  const [arrivalInsight, setArrivalInsight] = useState(null);
+  const [arrivalInsightLoading, setArrivalInsightLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -81,11 +76,10 @@ export default function SmartParkingAssistant() {
         let msg = e instanceof Error ? e.message : 'Failed to load forecast';
         if (status === 404) {
           msg +=
-            ' If this keeps happening, confirm the Node (Express) API runs on port 5000 and the Flask demand service runs on port 5001. In the project root .env file, set REACT_APP_API_BASE_URL=http://127.0.0.1:5000 (never point this at Flask on port 5001), then restart the frontend dev server with npm start.';
+            ' Confirm the Node (Express) API on port 5000 and Flask demand on 5001.';
         }
         if (status === 503) {
-          msg +=
-            ' Start the Flask service with python app.py (default port 5001) so Express can proxy forecast requests.';
+          msg += ' Start Flask (python app.py) so forecast can load.';
         }
         if (!cancelled) setForecastError(msg);
       } finally {
@@ -99,29 +93,29 @@ export default function SmartParkingAssistant() {
     };
   }, []);
 
+  /** Demand model for the user's chosen arrival (same API as booking flow). */
   useEffect(() => {
-    const { date, time } = adviceForm;
-    if (!date || !time) {
-      setAdviceInsight(null);
-      setAdviceLoading(false);
+    if (!schedulingReady || !reservationDate || !reservationTime) {
+      setArrivalInsight(null);
+      setArrivalInsightLoading(false);
       return;
     }
 
-    const startTime = new Date(`${date}T${time}`);
+    const startTime = new Date(`${reservationDate}T${reservationTime}`);
     if (Number.isNaN(startTime.getTime())) {
-      setAdviceInsight(null);
+      setArrivalInsight(null);
       return;
     }
 
     let cancelled = false;
-    setAdviceLoading(true);
+    setArrivalInsightLoading(true);
     const t = setTimeout(async () => {
       try {
         const insight = await fetchParkingDemandInsight(startTime);
         if (cancelled) return;
-        setAdviceInsight(insight || null);
+        setArrivalInsight(insight || null);
       } finally {
-        if (!cancelled) setAdviceLoading(false);
+        if (!cancelled) setArrivalInsightLoading(false);
       }
     }, 400);
 
@@ -129,45 +123,99 @@ export default function SmartParkingAssistant() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [adviceForm.date, adviceForm.time]);
+  }, [schedulingReady, reservationDate, reservationTime]);
 
   const current = forecastItems[0];
-  const forecastTrendLine = useMemo(
-    () => buildForecastTrendLine(forecastItems),
-    [forecastItems]
-  );
+  const forecastTrendLine = useMemo(() => buildForecastTrendLine(forecastItems), [forecastItems]);
 
-  const handleAdviceChange = (e) => {
-    const { name, value } = e.target;
-    setAdviceForm((prev) => ({ ...prev, [name]: value }));
+  const arrivalLabel = useMemo(() => {
+    if (!schedulingReady || !reservationDate || !reservationTime) return '';
+    try {
+      const d = new Date(`${reservationDate}T${reservationTime}`);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    } catch {
+      return '';
+    }
+  }, [schedulingReady, reservationDate, reservationTime]);
+
+  const arrivalTimeOnly = useMemo(() => {
+    if (!schedulingReady || !reservationDate || !reservationTime) return '';
+    const d = new Date(`${reservationDate}T${reservationTime}`);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  }, [schedulingReady, reservationDate, reservationTime]);
+
+  const demandWord = () => {
+    if (arrivalInsightLoading) return 'Analyzing…';
+    const lv = arrivalInsight?.level;
+    if (lv === 'High') return 'High';
+    if (lv === 'Medium') return 'Moderate';
+    if (lv === 'Low') return 'Low';
+    return '—';
   };
 
-  const bookingAdviceLiveLine = () => {
-    if (adviceLoading) return 'Running a live demand check for your arrival…';
-    if (!adviceForm.date || !adviceForm.time) return 'Select when you plan to arrive — guidance updates automatically.';
-    const lv = adviceInsight?.level;
-    if (lv === 'High') return 'High pressure window — follow the actions below.';
-    if (lv === 'Medium') return 'Mixed traffic — booking soon is still a solid option.';
-    if (lv === 'Low') return 'Great window — plenty of capacity expected.';
-    return 'Same intelligence as Make Reservation — tweak date or time to refresh.';
+  const arrivalLevelVerb = () => {
+    if (arrivalInsightLoading) return 'Checking modeled demand…';
+    const lv = arrivalInsight?.level;
+    if (lv === 'High') return 'Demand at this time appears high — consider an off-peak window if you can.';
+    if (lv === 'Medium') return 'Moderate traffic — booking now is reasonable.';
+    if (lv === 'Low') return 'Typically calmer demand — good time to reserve.';
+    return 'Tune your arrival above to refresh insight.';
   };
+
+  const recommendedLine = () => {
+    const lv = arrivalInsight?.level;
+    if (!lv) return '—';
+    if (lv === 'Low') return 'Recommended: Good time to book.';
+    if (lv === 'Medium') return 'Recommended: Acceptable window — compare the forecast strip below.';
+    if (lv === 'High') return 'Recommended: Shift earlier/later if your schedule allows.';
+    return 'See detail below.';
+  };
+
+  if (!schedulingReady) {
+    return null;
+  }
 
   return (
     <section
-      className="dashboard-section smart-parking-assistant"
+      className="dashboard-section smart-parking-assistant smart-parking-assistant--revealed spa-premium-shell smart-parking-assistant-reveal-mount"
       aria-labelledby="smart-parking-assistant-title"
     >
-      <header className="smart-parking-assistant__header">
-        <h2 id="smart-parking-assistant-title" className="smart-parking-assistant__title">
-          Smart Parking Assistant
-        </h2>
-        <p className="smart-parking-assistant__tagline">AI-powered demand prediction</p>
+      <header className="smart-parking-assistant__header spa-premium-head">
+        <div>
+          <h2 id="smart-parking-assistant-title" className="smart-parking-assistant__title">
+            Smart Parking Assistant
+          </h2>
+          <p className="smart-parking-assistant__tagline">
+            Personalized for your arrival{arrivalLabel ? ` · ${arrivalLabel}` : ''}
+          </p>
+        </div>
       </header>
 
+      <div className="spa-arrival-banner" role="region" aria-labelledby="spa-arrival-demand-label">
+        <div className="spa-arrival-banner__label" id="spa-arrival-demand-label">
+          Your arrival window
+        </div>
+        <p className="spa-arrival-banner__hero-line">
+          {arrivalInsightLoading ? (
+            <span>Analyzing demand for this time slot…</span>
+          ) : (
+            <>
+              <span className="spa-arrival-banner__prefix">Demand at </span>
+              <strong>{arrivalTimeOnly || arrivalLabel || 'your time'}</strong>
+              <span className="spa-arrival-banner__suffix">: </span>
+              <span>{demandWord()}</span>
+            </>
+          )}
+        </p>
+        <p className="spa-arrival-banner__recommended">{recommendedLine()}</p>
+      </div>
+
       <div className="smart-parking-assistant__block">
-        <h3 className="smart-parking-assistant__heading">Current Demand</h3>
+        <h3 className="smart-parking-assistant__heading">Live lot forecast · now onwards</h3>
         <p className="smart-parking-assistant__hint">
-          How busy the parking is expected to be right now.
+          Six-hour modeled outlook from the model clock (helps you compare trends with your chosen arrival above).
         </p>
 
         {forecastLoading && (
@@ -195,14 +243,14 @@ export default function SmartParkingAssistant() {
         )}
 
         {!forecastLoading && !forecastError && !current && (
-          <p className="empty-state">No demand data available.</p>
+          <p className="empty-state">No forecast data available.</p>
         )}
       </div>
 
       <div className="smart-parking-assistant__block">
         <h3 className="smart-parking-assistant__heading">Next 6 Hours Forecast</h3>
         <p className="smart-parking-assistant__hint">
-          Six-hour window from now: the following five hours after the current hour (see Current Demand above).
+          Horizon from model “now”: five steps after current hour — use with your arrival insight above.
         </p>
 
         {!forecastLoading && !forecastError && forecastItems.length > 1 && (
@@ -221,50 +269,26 @@ export default function SmartParkingAssistant() {
             <div className="spa-booking-advice-intro__top">
               <div>
                 <h3 className="spa-booking-advice-intro__title">Booking advice</h3>
-                <p className="spa-booking-advice-intro__kicker">Decision support · Live model</p>
+                <p className="spa-booking-advice-intro__kicker">Decision support · your selected time</p>
               </div>
             </div>
             <p
-              className={`spa-booking-advice-intro__live ${adviceLoading ? 'spa-booking-advice-intro__live--pulse' : ''}`}
+              className={`spa-booking-advice-intro__live ${arrivalInsightLoading ? 'spa-booking-advice-intro__live--pulse' : ''}`}
               role="status"
               aria-live="polite"
             >
-              {bookingAdviceLiveLine()}
+              {arrivalLevelVerb()}
             </p>
           </div>
         </div>
 
-        <div className="spa-booking-row">
-          <div className="form-group">
-            <label htmlFor="spa-advice-date">Date</label>
-            <input
-              id="spa-advice-date"
-              type="date"
-              name="date"
-              value={adviceForm.date}
-              onChange={handleAdviceChange}
-              min={new Date().toISOString().split('T')[0]}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="spa-advice-time">Time</label>
-            <input
-              id="spa-advice-time"
-              type="time"
-              name="time"
-              value={adviceForm.time}
-              onChange={handleAdviceChange}
-            />
-          </div>
-        </div>
-
-        {adviceLoading && (
+        {arrivalInsightLoading && (
           <p className="parkgo-demand-loading" role="status">
-            Checking typical demand for this time…
+            Checking modeled demand at your arrival…
           </p>
         )}
 
-        {!adviceLoading && adviceInsight && <DemandGuidanceBanner insight={adviceInsight} />}
+        {!arrivalInsightLoading && arrivalInsight && <DemandGuidanceBanner insight={arrivalInsight} />}
       </div>
     </section>
   );

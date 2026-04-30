@@ -1318,3 +1318,570 @@
   background: rgba(139, 92, 246, 0.22);
   color: #c4b5fd;
 }
+
+/* —— User dashboard: map-first flow, sticky confirm, booking card —— */
+
+/* Airy rhythm: extra space between stacked blocks, softer card chrome */
+.dashboard.user-dashboard-flow .dashboard-content.user-dashboard-flow__main {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(2rem, 5vw, 3.25rem);
+  padding-bottom: 3rem;
+}
+
+@media (min-width: 768px) {
+  .dashboard.user-dashboard-flow .dashboard-content.user-dashboard-flow__main {
+    padding-bottom: 3.5rem;
+  }
+}
+
+.dashboard.user-dashboard-flow .dashboard-section {
+  border-color: rgba(148, 163, 184, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  background: var(--bg-card);
+}
+
+.dashboard.user-dashboard-flow .dashboard-section h2 {
+  margin-bottom: 1.125rem;
+}
+
+/* Match .dashboard-content horizontal inset (incl. centered 1400px column) */
+.dashboard.user-dashboard-flow .dashboard-header.user-dashboard-flow__masthead {
+  border-bottom-color: rgba(148, 163, 184, 0.12);
+  box-shadow: none;
+  align-items: flex-start;
+  justify-content: flex-start;
+  text-align: left;
+  gap: clamp(1rem, 3vw, 1.75rem);
+  padding-top: 1rem;
+  padding-bottom: clamp(1rem, 2.5vw, 1.5rem);
+  padding-left: calc((100vw - min(1400px, 100vw)) / 2 + 1.25rem);
+  padding-right: calc((100vw - min(1400px, 100vw)) / 2 + 1.25rem);
+}
+
+@media (min-width: 768px) {
+  .dashboard.user-dashboard-flow .dashboard-header.user-dashboard-flow__masthead {
+    padding-left: calc((100vw - min(1400px, 100vw)) / 2 + 2.5rem);
+    padding-right: calc((100vw - min(1400px, 100vw)) / 2 + 2.5rem);
+  }
+}
+
+@media (min-width: 1200px) {
+  .dashboard.user-dashboard-flow .dashboard-header.user-dashboard-flow__masthead {
+    padding-left: calc((100vw - min(1400px, 100vw)) / 2 + 3rem);
+    padding-right: calc((100vw - min(1400px, 100vw)) / 2 + 3rem);
+  }
+}
+
+.user-dash-masthead-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 0.35rem 1rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.user-dash-masthead-intro {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+/* Masthead — title + welcome (scoped so global .dashboard-header h1 doesn’t win) */
+.dashboard.user-dashboard-flow .user-dash-masthead-intro h1 {
+  margin: 0 0 clamp(0.5rem, 1.5vw, 0.75rem); /* 8–12px below title */
+  font-size: clamp(1.5rem, 2.2vw, 1.75rem); /* 24–28px */
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.dashboard.user-dashboard-flow .user-dash-masthead-intro p {
+  margin: 0;
+  max-width: 44rem;
+  font-size: clamp(0.9375rem, 1.1vw, 1rem); /* 15–16px */
+  font-weight: 500;
+  line-height: 1.5;
+  color: #c8d0dc; /* muted vs primary, still readable on dark */
+  letter-spacing: 0.01em;
+}
+
+.dashboard.user-dashboard-flow .user-dash-masthead-intro p strong {
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.95);
+}
+
+/* Secondary outline — muted, smaller than primary CTAs; baseline-aligned in masthead row */
+.btn.user-dash-report-incident-btn {
+  margin: 0;
+  margin-left: auto;
+  padding: 6px 12px;
+  font-size: clamp(0.8125rem, 1.6vw, 0.875rem); /* 13–14px */
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  color: var(--text-muted);
+  box-shadow: none;
+  align-self: baseline;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.btn.user-dash-report-incident-btn:hover {
+  background: rgba(148, 163, 184, 0.14);
+  border-color: rgba(186, 198, 214, 0.58);
+  color: #cbd5e1;
+  transform: none;
+}
+
+.btn.user-dash-report-incident-btn:active {
+  background: rgba(148, 163, 184, 0.2);
+  transition-duration: 0.15s;
+}
+
+.btn.user-dash-report-incident-btn:focus-visible {
+  outline: 2px solid rgba(148, 163, 184, 0.55);
+  outline-offset: 2px;
+}
+
+.user-dashboard-flow--sticky {
+  padding-bottom: calc(5.75rem + env(safe-area-inset-bottom));
+}
+
+.dashboard-section.dashboard-section--featured.user-dash-map-first {
+  border-color: rgba(59, 130, 246, 0.15);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
+  background: var(--bg-card);
+}
+
+.user-dash-map-first .parking-slots-grid-wrap {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.user-dash-map-first .parking-slots-grid {
+  gap: 0.85rem;
+}
+
+.user-dash-map-first .parking-overview-hint {
+  margin-bottom: 1.35rem;
+}
+
+.user-dash-hl-available {
+  color: #86efac;
+  font-weight: 600;
+}
+
+.dashboard-section-intro {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.user-dash-booking-card__top {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 1.35rem;
+}
+
+@media (min-width: 720px) {
+  .user-dash-booking-card__top {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.25rem;
+  }
+}
+
+.user-dash-slot-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.65rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 10px;
+  background: rgba(37, 99, 235, 0.06);
+  border: none;
+}
+
+.user-dash-slot-chip__label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  width: 100%;
+}
+
+@media (min-width: 720px) {
+  .user-dash-slot-chip__label {
+    width: auto;
+  }
+}
+
+.user-dash-slot-chip__spot {
+  font-size: 1.125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.user-dash-slot-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.user-dash-slot-badge--available {
+  background: rgba(34, 197, 94, 0.2);
+  color: #bbf7d0;
+  border: 1px solid rgba(34, 197, 94, 0.42);
+}
+
+.user-dash-slot-badge--reserved {
+  background: rgba(234, 179, 8, 0.2);
+  color: #fef08a;
+  border: 1px solid rgba(234, 179, 8, 0.45);
+}
+
+.user-dash-slot-badge--occupied {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fecaca;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+}
+
+.user-dash-slot-badge--muted {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-muted);
+  border: 1px solid var(--border-subtle);
+}
+
+.user-dash-slot-hint-muted {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+  max-width: 28rem;
+}
+
+fieldset.user-dash-inline-form {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.user-dash-scheduling-block .user-dash-inline-form {
+  margin-top: 1.25rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.user-dash-scheduling-block--open .user-dash-inline-form:not(.user-dash-inline-form--continue-reveal) {
+  animation: udScheduleReveal 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Re-triggered when user clicks Continue (smooth scroll to form) */
+fieldset.user-dash-inline-form.user-dash-inline-form--continue-reveal {
+  animation: udBookingContinueReveal 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes udBookingContinueReveal {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.user-dash-inline-form > .form-row + .form-row {
+  margin-top: 1.25rem;
+}
+
+.user-dash-soft-hint {
+  margin: 1.1rem 0 0 0;
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.user-dash-output {
+  display: inline-block;
+  min-height: 1.5rem;
+}
+
+.user-dash-tail {
+  gap: 2.5rem;
+}
+
+@media (min-width: 768px) {
+  .user-dash-tail {
+    gap: 3rem;
+  }
+}
+
+.user-dash-sticky-confirm {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 105;
+  padding: 0.65rem calc(1.25rem + env(safe-area-inset-right)) calc(0.65rem + env(safe-area-inset-bottom))
+    calc(1.25rem + env(safe-area-inset-left));
+  pointer-events: none;
+}
+
+@media (min-width: 768px) {
+  .user-dash-sticky-confirm {
+    padding-left: calc(2rem + env(safe-area-inset-left));
+    padding-right: calc(2rem + env(safe-area-inset-right));
+  }
+}
+
+@media (min-width: 1200px) {
+  .user-dash-sticky-confirm {
+    padding-left: calc(2.5rem + env(safe-area-inset-left));
+    padding-right: calc(2.5rem + env(safe-area-inset-right));
+  }
+}
+
+.user-dash-sticky-confirm__bar {
+  pointer-events: auto;
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.95rem 1.25rem;
+  border-radius: 14px 14px 0 0;
+  border: none;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(12px);
+}
+
+.user-dash-sticky-confirm__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.user-dash-sticky-confirm__line {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-dash-sticky-confirm__line strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.user-dash-sticky-confirm__total {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--logo-blue-light, #93c5fd);
+  font-variant-numeric: tabular-nums;
+}
+
+.user-dash-sticky-confirm__cta {
+  flex-shrink: 0;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+  font-weight: 700;
+  box-shadow: 0 4px 20px rgba(37, 99, 235, 0.2);
+}
+
+/* Guided booking UX: slot picker card, demand banner, a11y */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.user-dash-slot-picker-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 1.1rem 1.25rem;
+  border-radius: 14px;
+  border: none;
+  background: rgba(37, 99, 235, 0.08);
+  box-shadow: none;
+}
+
+.user-dash-slot-picker-card--enter {
+  animation: udSlotCardEnter 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes udSlotCardEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.user-dash-slot-picker-card__main {
+  min-width: 0;
+}
+
+.user-dash-slot-picker-card__title {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.user-dash-slot-picker-card__cta.btn {
+  min-width: 12rem;
+}
+
+.user-dash-slot-picker-card__cta:active {
+  transform: translateY(1px);
+}
+
+.user-dash-scheduling-block {
+  position: relative;
+}
+
+.user-dash-scheduling-block__shield {
+  margin: 0;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  font-size: 0.895rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  border: none;
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.dashboard-section.user-dash-booking-card {
+  margin-bottom: 0;
+}
+
+/* Smooth scroll target: clears fixed nav / breathing room */
+#user-dash-booking-panel {
+  scroll-margin-top: clamp(4rem, 12vh, 6rem);
+}
+
+.user-dash-soft-hint--await-time {
+  border-left: 2px solid rgba(96, 165, 250, 0.35);
+  padding-left: 1rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.user-dash-soft-hint--review {
+  border-left: 2px solid rgba(34, 197, 94, 0.35);
+  padding-left: 1rem;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+  color: rgba(203, 213, 225, 0.95);
+}
+
+.user-dash-assistant-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  scroll-margin-top: 5.5rem;
+}
+
+.user-dash-demand-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 1rem 1.15rem;
+  border-radius: 12px;
+  border: none;
+  background: rgba(148, 163, 184, 0.07);
+  animation: udDemandBannerIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+  box-shadow: none;
+}
+
+.user-dash-demand-banner__emoji {
+  font-size: 1.125rem;
+  line-height: 1.35;
+}
+
+.user-dash-demand-banner__text {
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.user-dash-demand-banner--loading {
+  background: rgba(37, 99, 235, 0.1);
+}
+
+.user-dash-demand-banner--low {
+  background: rgba(34, 197, 94, 0.1);
+}
+
+.user-dash-demand-banner--mid {
+  background: rgba(234, 179, 8, 0.1);
+}
+
+.user-dash-demand-banner--high {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+.user-dash-demand-banner--neutral {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+@keyframes udDemandBannerIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes udScheduleReveal {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

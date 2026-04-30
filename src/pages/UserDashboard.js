@@ -26,6 +26,9 @@ import { tieredBookingTotalEgp, extraHourChargeEgp } from '../utils/parkingPrici
 const OVERSTAY_RATE_DISPLAY =
   Number(process.env.REACT_APP_OVERSTAY_HOURLY_RATE) || extraHourChargeEgp();
 
+/** Inline booking fieldset — used for Continue → scroll + reveal animation. */
+const UDB_BOOKING_FIELDSET_ID = 'udb-booking-fieldset';
+
 const UserDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -100,9 +103,9 @@ const UserDashboard = () => {
     }
   }, [slots, pendingSlotNo]);
 
-  /** Load demand prediction when date + time are set (booking modal). */
+  /** Demand hint for popup modal (same times as inline booking panel). */
   useEffect(() => {
-    if (!showReservationModal || !reservationData.date || !reservationData.time) {
+    if (!reservationData.date || !reservationData.time) {
       setDemandInsight(null);
       setDemandInsightLoading(false);
       return;
@@ -120,11 +123,7 @@ const UserDashboard = () => {
       try {
         const insight = await fetchParkingDemandInsight(startTime);
         if (cancelled) return;
-        if (insight) {
-          setDemandInsight(insight);
-        } else {
-          setDemandInsight(null);
-        }
+        setDemandInsight(insight ?? null);
       } finally {
         if (!cancelled) setDemandInsightLoading(false);
       }
@@ -134,11 +133,82 @@ const UserDashboard = () => {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [
-    showReservationModal,
-    reservationData.date,
-    reservationData.time,
-  ]);
+  }, [reservationData.date, reservationData.time]);
+
+  /** Valid arrival ⇒ Smart Parking Assistant expands with full insight payload. */
+  const schedulingReady = useMemo(() => {
+    if (!reservationData.date?.trim() || !reservationData.time?.trim()) return false;
+    const start = new Date(`${reservationData.date}T${reservationData.time}`);
+    return !Number.isNaN(start.getTime());
+  }, [reservationData.date, reservationData.time]);
+
+  const canConfirmBooking = schedulingReady && Boolean(pendingSlotNo);
+
+  /** Short feedback above SPA after date + time (uses same demand insight as modal). */
+  const demandToneBanner = useMemo(() => {
+    if (!schedulingReady || !pendingSlotNo) return null;
+    if (demandInsightLoading) {
+      return { modifier: 'loading', emoji: '📊', headline: 'Checking demand for your arrival…' };
+    }
+    const norm = String(demandInsight?.level || '').toLowerCase();
+    if (norm === 'low') return { modifier: 'low', emoji: '🟢', headline: 'Great time to book' };
+    if (norm === 'medium') return { modifier: 'mid', emoji: '🟡', headline: 'Moderate traffic expected' };
+    if (norm === 'high') return { modifier: 'high', emoji: '🔴', headline: 'High demand — consider another time' };
+    return { modifier: 'neutral', emoji: 'ℹ️', headline: 'Demand insight will refine as models respond.' };
+  }, [schedulingReady, pendingSlotNo, demandInsightLoading, demandInsight]);
+
+  const schedulingReadyEnteredRef = useRef(false);
+
+  useEffect(() => {
+    if (!schedulingReady) {
+      schedulingReadyEnteredRef.current = false;
+      return undefined;
+    }
+    if (schedulingReadyEnteredRef.current) return undefined;
+    schedulingReadyEnteredRef.current = true;
+    const tid = window.setTimeout(() => {
+      document.getElementById('user-dash-assistant-stack')?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }, 420);
+    return () => window.clearTimeout(tid);
+  }, [schedulingReady]);
+
+  const scrollToBookingPanel = () => {
+    const panel = document.getElementById('user-dash-booking-panel');
+    panel?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+      inline: 'nearest',
+    });
+
+    window.requestAnimationFrame(() => {
+      window.setTimeout(() => {
+        const fs = document.getElementById(UDB_BOOKING_FIELDSET_ID);
+        if (!fs) return;
+        fs.classList.remove('user-dash-inline-form--continue-reveal');
+        void fs.offsetWidth;
+        fs.classList.add('user-dash-inline-form--continue-reveal');
+        const onAnimationEnd = () => {
+          fs.classList.remove('user-dash-inline-form--continue-reveal');
+          fs.removeEventListener('animationend', onAnimationEnd);
+        };
+        fs.addEventListener('animationend', onAnimationEnd);
+      }, 72);
+    });
+  };
+
+  /** Live map state for the selected bay (summary next to chip). */
+  const pendingSlotLive = useMemo(() => {
+    if (!pendingSlotNo) return null;
+    const row = slots.find((s) => String(s.slot_no) === String(pendingSlotNo));
+    if (!row) return { label: 'Unknown', tone: 'muted' };
+    const n = Number(row.state);
+    if (n === 0) return { label: 'Available', tone: 'available' };
+    if (n === 2) return { label: 'Reserved', tone: 'reserved' };
+    return { label: 'Occupied', tone: 'occupied' };
+  }, [pendingSlotNo, slots]);
 
   const loadSlots = async () => {
     setSlotsLoading(true);
@@ -422,16 +492,29 @@ const UserDashboard = () => {
   };
 
   return (
-    <div className="dashboard">
+    <div className={`dashboard user-dashboard-flow${canConfirmBooking ? ' user-dashboard-flow--sticky' : ''}`}>
       <Navbar hideLotDesignerLink />
-      <header className="dashboard-header">
-        <div>
-          <h1>User Dashboard</h1>
-          <p>Welcome, {user?.first_name || user?.firstName} {user?.last_name || user?.lastName}</p>
+      <header className="dashboard-header user-dashboard-flow__masthead">
+        <div className="user-dash-masthead-row">
+          <div className="user-dash-masthead-intro">
+            <h1>User Dashboard</h1>
+            <p>
+              Welcome back, Meral.
+              <br />
+              Choose your parking spot to begin.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn user-dash-report-incident-btn"
+            onClick={() => navigate('/user/report-incident')}
+          >
+            Report an incident
+          </button>
         </div>
       </header>
 
-      <div className="dashboard-content">
+      <div className="dashboard-content user-dashboard-flow__main">
         {checkInUrgentWarnings.length > 0 && (
           <div className="checkin-deadline-panel" role="alert" aria-live="polite">
             {checkInUrgentWarnings.map((w) => (
@@ -474,63 +557,196 @@ const UserDashboard = () => {
           </div>
         )}
 
-        <div className="dashboard-actions">
-          <button
-            onClick={() => setShowReservationModal(true)}
-            className="btn btn-primary"
-          >
-            + Make Reservation
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/user/report-incident')}
-            className="btn btn-secondary"
-          >
-            Report Incident
-          </button>
-          <button
-            onClick={() => { loadReservationsAndHistory(); loadSlots(); }}
-            className="btn btn-secondary"
-          >
-            Refresh
-          </button>
+        <div className="dashboard-section parking-overview-dashboard dashboard-section--map dashboard-section--featured user-dash-map-first">
+          <h2 id="user-dash-map-heading">Parking map — choose your bay</h2>
+          <p className="parking-overview-hint">
+            <strong>{LOT_NAME}</strong> — tap a <strong className="user-dash-hl-available">green</strong> bay. You get
+            instant confirmation below the map before scheduling date and time.
+          </p>
+
+          {slotsLoading ? (
+            <p className="empty-state">Loading slots...</p>
+          ) : slotsError ? (
+            <p className="empty-state slots-error">{slotsError}</p>
+          ) : slots.length === 0 ? (
+            <p className="empty-state">No slots available</p>
+          ) : (
+            <AlexandriaParkingGrid
+              slots={slots}
+              selectedSlotNo={pendingSlotNo}
+              onSlotClick={(slotNo) => {
+                setPendingSlotNo(slotNo);
+                try {
+                  localStorage.setItem(PARKGO_PENDING_SLOT_KEY, slotNo);
+                } catch {
+                  /* ignore */
+                }
+              }}
+              showLegend
+            />
+          )}
+
+          {!slotsLoading && !slotsError && slots.length > 0 && pendingSlotNo && (
+            <div className="user-dash-slot-picker-card user-dash-slot-picker-card--enter" aria-live="polite">
+              <div className="user-dash-slot-picker-card__main">
+                <p className="user-dash-slot-picker-card__title">Slot {pendingSlotNo} selected</p>
+              </div>
+              <button type="button" className="btn btn-primary user-dash-slot-picker-card__cta" onClick={scrollToBookingPanel}>
+                Continue<span aria-hidden> →</span>
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="dashboard-sections">
-          <SmartParkingAssistant />
-
-          <div className="dashboard-section parking-overview-dashboard">
-            <h2>Parking Overview</h2>
-            <p className="parking-overview-hint">
-              {LOT_NAME} — same map as on the booking page.{' '}
-              {pendingSlotNo
-                ? <>Selected spot: <strong>{pendingSlotNo}</strong> (used when you confirm a reservation).</>
-                : <>Tap a green slot to choose it, then open <strong>Make Reservation</strong>.</>}
-            </p>
-
-            {slotsLoading ? (
-              <p className="empty-state">Loading slots...</p>
-            ) : slotsError ? (
-              <p className="empty-state slots-error">{slotsError}</p>
-            ) : slots.length === 0 ? (
-              <p className="empty-state">No slots available</p>
+        <div id="user-dash-booking-panel" className="dashboard-section dashboard-section--booking-controls user-dash-booking-card">
+          <div className="user-dash-booking-card__top">
+            <div>
+              <h2>Your booking</h2>
+              <p className="dashboard-section-intro">
+                Pick a bay on the map, then set arrival details—the Smart Parking Assistant expands once date and time are
+                complete.
+              </p>
+            </div>
+            {pendingSlotNo ? (
+              <div className="user-dash-slot-chip" aria-live="polite">
+                <span className="user-dash-slot-chip__label">Selected bay</span>
+                <strong className="user-dash-slot-chip__spot">{pendingSlotNo}</strong>
+                {pendingSlotLive && (
+                  <span
+                    className={`user-dash-slot-badge user-dash-slot-badge--${pendingSlotLive.tone}`}
+                    title="Status on the map right now"
+                  >
+                    {pendingSlotLive.label}
+                  </span>
+                )}
+                <button type="button" className="btn btn-secondary btn-sm" onClick={clearPendingSlot}>
+                  Clear bay
+                </button>
+              </div>
             ) : (
-              <AlexandriaParkingGrid
-                slots={slots}
-                selectedSlotNo={pendingSlotNo}
-                onSlotClick={(slotNo) => {
-                  setPendingSlotNo(slotNo);
-                  try {
-                    localStorage.setItem(PARKGO_PENDING_SLOT_KEY, slotNo);
-                  } catch {
-                    /* ignore */
-                  }
-                }}
-                showLegend
-              />
+              <p className="user-dash-slot-hint-muted" role="status">
+                No bay selected — choose a green slot on the map above.
+              </p>
             )}
           </div>
 
+          <ParkingRulesSection />
+
+          <div
+            className={`user-dash-scheduling-block ${pendingSlotNo ? 'user-dash-scheduling-block--open' : 'user-dash-scheduling-block--locked'}`}
+          >
+            {!pendingSlotNo ? (
+              <p className="user-dash-scheduling-block__shield" role="note">
+                Select an <strong>available</strong> bay on the map above to show date, start time, duration, and payment
+                options here.
+              </p>
+            ) : (
+              <fieldset id={UDB_BOOKING_FIELDSET_ID} className="user-dash-inline-form">
+                <legend className="sr-only">Booking details — date through payment</legend>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="udb-date">Date *</label>
+                    <input
+                      id="udb-date"
+                      type="date"
+                      name="date"
+                      value={reservationData.date}
+                      onChange={handleReservationChange}
+                      min={new Date().toISOString().split('T')[0]}
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="udb-time">Start time *</label>
+                    <input
+                      id="udb-time"
+                      type="time"
+                      name="time"
+                      value={reservationData.time}
+                      onChange={handleReservationChange}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="udb-duration">Duration (hours) *</label>
+                    <input
+                      id="udb-duration"
+                      type="number"
+                      name="duration"
+                      value={reservationData.duration}
+                      onChange={handleReservationChange}
+                      min="1"
+                      max="24"
+                      required
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="udb-vt">Vehicle type *</label>
+                    <select id="udb-vt" name="vehicleType" value={reservationData.vehicleType} onChange={handleReservationChange} required>
+                      <option value="car">Car</option>
+                      <option value="motorcycle">Motorcycle</option>
+                      <option value="truck">Truck</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="udb-pay">Payment</label>
+                    <select id="udb-pay" name="paymentMethod" value={reservationData.paymentMethod} onChange={handleReservationChange}>
+                      <option value="cash">Cash</option>
+                      <option value="card">Card (Paymob)</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="udb-total-inline">Estimated total</label>
+                    <output id="udb-total-inline" htmlFor="udb-duration" className="reservation-total-amount-display user-dash-output">
+                      {formatEgp(reservationModalEstimateEgp)}
+                    </output>
+                  </div>
+                </div>
+              </fieldset>
+            )}
+          </div>
+
+          {!schedulingReady && pendingSlotNo && (
+            <p className="user-dash-soft-hint user-dash-soft-hint--await-time" role="note">
+              Set a valid <strong>date</strong> and <strong>start time</strong> to unlock forecasts and tailored advice below.
+            </p>
+          )}
+          {schedulingReady && pendingSlotNo && (
+            <p className="user-dash-soft-hint user-dash-soft-hint--review" role="status">
+              Review totals and pricing rules, then use <strong>Confirm Booking</strong> in the sticky bar below.
+            </p>
+          )}
+        </div>
+
+        {schedulingReady ? (
+          <section id="user-dash-assistant-stack" className="user-dash-assistant-stack" aria-label="Parking intelligence">
+            {demandToneBanner != null ? (
+              <div
+                key={`${demandToneBanner.modifier}-${demandToneBanner.headline}`}
+                className={`user-dash-demand-banner user-dash-demand-banner--${demandToneBanner.modifier}`}
+                role="status"
+                aria-live="polite"
+              >
+                <span className="user-dash-demand-banner__emoji" aria-hidden>
+                  {demandToneBanner.emoji}
+                </span>
+                <span className="user-dash-demand-banner__text">{demandToneBanner.headline}</span>
+              </div>
+            ) : null}
+
+            <SmartParkingAssistant
+              schedulingReady
+              reservationDate={reservationData.date}
+              reservationTime={reservationData.time}
+            />
+          </section>
+        ) : null}
+
+        <div className="dashboard-sections user-dash-tail">
           <div className="dashboard-section">
             <h2>Current bookings</h2>
             <p className="parking-overview-hint" style={{ marginBottom: '0.75rem' }}>
@@ -648,6 +864,29 @@ const UserDashboard = () => {
           </div>
 
         </div>
+
+        {canConfirmBooking && (
+          <aside className="user-dash-sticky-confirm" role="region" aria-label="Confirm reservation" aria-live="polite">
+            <div className="user-dash-sticky-confirm__bar">
+              <div className="user-dash-sticky-confirm__summary">
+                <span className="user-dash-sticky-confirm__line">
+                  <strong>Bay {pendingSlotNo}</strong>
+                  {' · '}
+                  {reservationData.date} {reservationData.time}
+                </span>
+                <span className="user-dash-sticky-confirm__total">{formatEgp(reservationModalEstimateEgp)}</span>
+              </div>
+              <button
+                type="button"
+                className="btn btn-primary user-dash-sticky-confirm__cta"
+                onClick={() => handleCreateReservation()}
+              >
+                Confirm Booking
+              </button>
+            </div>
+          </aside>
+        )}
+
       </div>
 
       {showExitQRModal && exitQRReservation && (
