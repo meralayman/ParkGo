@@ -19,7 +19,8 @@ function reservationQrSecret() {
 }
 
 function signReservationQrJwt(bookingId) {
-  return jwt.sign({ bookingId }, reservationQrSecret(), { expiresIn: "1h" });
+  /** Long TTL in JWT only for diagnostics; `/gate/*` validates using DB `qr_expires_at` / end + grace after verify ignores exp. */
+  return jwt.sign({ bookingId }, reservationQrSecret(), { expiresIn: "30d", algorithm: "HS256" });
 }
 
 function qrSecret() {
@@ -156,16 +157,19 @@ function verifyBookingQrDetailed(token) {
     return null;
   };
 
+  /**
+   * Do not rely on the JWT embedded `exp` as the gate for parking QRs — simple `{ bookingId }`
+   * tokens used to use `expiresIn: 1h` while the reservation stays valid until `qr_expires_at`
+   * (typically end_time + grace). Honour DB-driven expiry only in `/gate/qr/preview`.
+   */
   const secrets = [...new Set([reservationQrSecret(), qrSecret()])];
   for (const secret of secrets) {
     try {
-      const p = jwt.verify(trimmed, secret);
+      const p = jwt.verify(trimmed, secret, { ignoreExpiration: true, algorithms: ["HS256"] });
       const out = fromPayload(p);
       if (out) return out;
-    } catch (e) {
-      if (e && e.name === "TokenExpiredError") {
-        return { ok: false, code: "EXPIRED", error: "This QR code has expired" };
-      }
+    } catch {
+      continue;
     }
   }
   return { ok: false, code: "INVALID", error: "Invalid QR code or signature" };

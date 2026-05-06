@@ -1048,7 +1048,8 @@ app.post("/reservations", bookingRateLimiter, async (req, res) => {
 
     await client.query("COMMIT");
     const reservationOut = { ...row };
-    const qrJwt = signReservationQrJwt(reservationOut.id);
+    /** Same token shape as GET /reservations/user (legacy JTI + wall-clock exp), not the 1h demo JWT. */
+    const qrJwt = buildBookingQrJwtForRow(reservationOut) || signReservationQrJwt(reservationOut.id);
     delete reservationOut.qr_token;
     reservationOut.qrJwt = qrJwt;
     logAudit(pool, {
@@ -1689,6 +1690,19 @@ app.post("/gate/qr/preview", qrRateLimiter, async (req, res) => {
           code: "USED_OR_REVOKED",
         });
       }
+      const effectiveExp = resolveQrExpiresAt(reservation);
+      if (!effectiveExp) {
+        return res.status(400).json({
+          ok: false,
+          error: "Booking has no valid QR expiration (missing end time)",
+          code: "NO_EXPIRY",
+        });
+      }
+      if (effectiveExp.getTime() < Date.now()) {
+        return res.status(401).json({ ok: false, error: "This QR code has expired", code: "EXPIRED" });
+      }
+    } else {
+      /** Simple `{ bookingId }` QR — JWT exp is not authoritative; gate uses reservation row only. */
       const effectiveExp = resolveQrExpiresAt(reservation);
       if (!effectiveExp) {
         return res.status(400).json({
