@@ -17,6 +17,7 @@ import ReportIncidentPage from './pages/ReportIncidentPage';
 import GatekeeperDashboard from './pages/GatekeeperDashboard';
 import ReportIncidentGatekeeperPage from './pages/ReportIncidentGatekeeperPage';
 import ProtectedRoute from './components/ProtectedRoute';
+import Chatbot from './components/Chatbot';
 import './App.css';
 
 const GOOGLE_CLIENT_ID = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
@@ -76,6 +77,7 @@ function AppRoutes() {
           }
         />
       </Routes>
+      <Chatbot />
     </div>
   );
 }

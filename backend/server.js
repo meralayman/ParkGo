@@ -404,6 +404,9 @@ function apiError(err) {
 const { registerAuthRoutes } = require("./routes/authRoutes");
 registerAuthRoutes(app, { pool, apiError, logAudit });
 
+const { registerChatbotRoutes } = require("./routes/chatbot.routes");
+registerChatbotRoutes(app, { pool, apiError, logAudit });
+
 /* -------------------- ROOT -------------------- */
 app.get("/", (req, res) => {
   res.json({

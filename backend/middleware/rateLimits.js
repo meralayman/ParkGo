@@ -53,8 +53,18 @@ const qrRateLimiter = (req, res, next) => {
   return _qrRateLimit(req, res, next);
 };
 
+/** Chatbot: POST /api/chatbot/message — prevents spam / prompt injection abuse (per IP). */
+const chatbotRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: json429("Too many chat messages. Please wait a moment and try again."),
+});
+
 module.exports = {
   loginRateLimiter,
   bookingRateLimiter,
   qrRateLimiter,
+  chatbotRateLimiter,
 };

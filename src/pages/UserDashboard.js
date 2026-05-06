@@ -14,6 +14,7 @@ import './Dashboard.css';
 import { QRCodeCanvas } from "qrcode.react";
 
 import { API_BASE } from '../config/apiBase';
+import { PARKGO_RESERVATIONS_CHANGED } from '../constants/parkgoEvents';
 import { fetchWithAuth } from '../utils/authFetch';
 import { fetchParkingDemandInsight } from '../utils/parkingDemandHint';
 import {
@@ -92,6 +93,18 @@ const UserDashboard = () => {
     if (user?.id) {
       loadReservationsAndHistory();
     }
+  }, [user?.id]);
+
+  /** Chatbot (and other clients) can create/cancel bookings without a full page reload. */
+  useEffect(() => {
+    if (!user?.id) return undefined;
+    const onReservationsChanged = () => {
+      loadReservationsAndHistory();
+      loadSlots();
+    };
+    window.addEventListener(PARKGO_RESERVATIONS_CHANGED, onReservationsChanged);
+    return () =>
+      window.removeEventListener(PARKGO_RESERVATIONS_CHANGED, onReservationsChanged);
   }, [user?.id]);
 
   /** Drop pending selection if that slot is gone or no longer free */
