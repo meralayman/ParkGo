@@ -9,6 +9,8 @@ import ParkingRulesSection from '../components/ParkingRulesSection';
 import AlexandriaParkingGrid from '../components/AlexandriaParkingGrid';
 import { LOT_NAME } from '../constants/alexandriaLot';
 import { PARKGO_PENDING_SLOT_KEY } from '../constants/pendingSlot';
+
+const PAYMENT_SUCCESS_TOAST_KEY = 'parkgo_payment_success_toast';
 import { formatEgp } from '../utils/formatEgp';
 import './Dashboard.css';
 import { QRCodeCanvas } from "qrcode.react";
@@ -75,6 +77,16 @@ const UserDashboard = () => {
       /* ignore */
     }
   };
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(PAYMENT_SUCCESS_TOAST_KEY) !== '1') return;
+      sessionStorage.removeItem(PAYMENT_SUCCESS_TOAST_KEY);
+      toast('Payment successful! Your reservation is confirmed.', { variant: 'success', duration: 9000 });
+    } catch {
+      /* ignore */
+    }
+  }, [location.key, toast]);
 
   useEffect(() => {
     try {

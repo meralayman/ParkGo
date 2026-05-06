@@ -34,6 +34,8 @@ const PaymentPage = () => {
 
   const [error, setError] = useState('');
   const [paymobEnabled, setPaymobEnabled] = useState(null);
+  /** True when backend has PAYMOB_MOCK_CHECKOUT (no iframe, simulated approval) */
+  const [checkoutMock, setCheckoutMock] = useState(false);
   const [phase, setPhase] = useState('idle'); // idle | redirecting | error
   const [showStuckHint, setShowStuckHint] = useState(false);
 
@@ -109,6 +111,19 @@ const PaymentPage = () => {
         return;
       }
 
+      if (data.mock) {
+        sessionStorage.removeItem(lk);
+        const q = new URLSearchParams({
+          success: 'true',
+          txn_response_code: 'APPROVED',
+          'data.message': 'Approved (PAYMOB_MOCK_CHECKOUT — no Paymob iframe)',
+          error_occured: 'false',
+          parkgo_mock: '1',
+        });
+        navigate({ pathname: '/payment/return', search: q.toString() }, { replace: true });
+        return;
+      }
+
       if (!data.iframeUrl) {
         sessionStorage.removeItem(lk);
         setError('Paymob did not return a checkout URL.');
@@ -122,7 +137,7 @@ const PaymentPage = () => {
       setError(friendlyFetchError(err));
       setPhase('error');
     }
-  }, [pending, user, billingPayload]);
+  }, [pending, user, billingPayload, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -141,8 +156,10 @@ const PaymentPage = () => {
           return;
         }
         if (cancelled) return;
-        if (d && d.ok) setPaymobEnabled(Boolean(d.enabled));
-        else setPaymobEnabled(false);
+        if (d && d.ok) {
+          setCheckoutMock(Boolean(d.mock));
+          setPaymobEnabled(Boolean(d.enabled));
+        } else setPaymobEnabled(false);
       } catch (err) {
         if (!cancelled) {
           setPaymobEnabled(false);
@@ -206,10 +223,16 @@ const PaymentPage = () => {
       <Navbar />
       <div className="auth-container">
         <div className="auth-card payment-card">
-          <h2>Pay with Paymob</h2>
+          <h2>{checkoutMock ? 'Pay (simulated checkout)' : 'Pay with Paymob'}</h2>
           <p className="auth-subtitle">
             Amount due: <strong>{formatEgp(amount)}</strong>
           </p>
+          {checkoutMock && (
+            <p className="auth-subtitle" style={{ fontSize: 13 }}>
+              <code>PAYMOB_MOCK_CHECKOUT</code> is on: no card page — payment is marked approved locally
+              for testing only.
+            </p>
+          )}
 
           {error && <div className="error-message">{error}</div>}
 
@@ -220,13 +243,17 @@ const PaymentPage = () => {
           {paymobEnabled === false && !error && (
             <div className="error-message" style={{ marginBottom: '1rem' }}>
               Card payment uses Paymob only. Add <code>PAYMOB_API_KEY</code>,{' '}
-              <code>PAYMOB_INTEGRATION_ID</code>, and <code>PAYMOB_IFRAME_ID</code> to{' '}
-              <code>backend/.env</code>, then restart the API server.
+              <code>PAYMOB_INTEGRATION_ID</code>, and               <code>PAYMOB_IFRAME_ID</code> to <code>backend/.env</code>, or enable{' '}
+              <code>PAYMOB_MOCK_CHECKOUT=true</code> for local simulated approval without Paymob — then restart
+              the API server.
             </div>
           )}
 
-          {paymobEnabled === true && phase === 'redirecting' && !error && (
+          {paymobEnabled === true && phase === 'redirecting' && !error && !checkoutMock && (
             <p className="auth-subtitle">Redirecting you to Paymob secure checkout…</p>
+          )}
+          {paymobEnabled === true && phase === 'redirecting' && !error && checkoutMock && (
+            <p className="auth-subtitle">Completing simulated payment…</p>
           )}
 
           {(phase === 'error' || showStuckHint) && paymobEnabled === true && (

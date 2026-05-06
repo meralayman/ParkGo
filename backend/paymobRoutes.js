@@ -11,7 +11,17 @@
  * - PAYMOB_CURRENCY         (default EGP)
  * - FRONTEND_URL            (default http://localhost:3000) used for return URL
  * - PAYMOB_BILLING_COUNTRY  (default EG)
+ * - PAYMOB_FETCH_MS         (optional ms timeout for Paymob HTTP calls; default 30000)
+ * - PAYMOB_MOCK_CHECKOUT    (optional) if "true", skips Paymob API and iframe — simulates
+ *                           approved card payment for local/dev only. Never enable in production.
  */
+
+function mockCheckoutEnabled() {
+  const v = String(process.env.PAYMOB_MOCK_CHECKOUT || "")
+    .trim()
+    .toLowerCase();
+  return v === "true" || v === "1" || v === "yes";
+}
 
 function configured() {
   return Boolean(
@@ -26,11 +36,20 @@ function baseUrl() {
 }
 
 async function postJson(url, body) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  const ms = Number(process.env.PAYMOB_FETCH_MS || "30000");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), Number.isFinite(ms) && ms > 0 ? ms : 30000);
+  let res;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error(data?.message || data?.detail || `Paymob HTTP ${res.status}`);
@@ -76,20 +95,17 @@ async function createPaymentKey(authToken, orderId, amountCents, currency, billi
 
 function registerPaymobRoutes(app) {
   app.get("/paymob/config", (req, res) => {
-    res.json({ ok: true, enabled: configured() });
+    const mock = mockCheckoutEnabled();
+    res.json({
+      ok: true,
+      enabled: configured() || mock,
+      mock,
+    });
   });
 
   app.post("/paymob/session", async (req, res) => {
     try {
-      if (!configured()) {
-        return res.status(503).json({
-          ok: false,
-          error: "Paymob is not configured. Set PAYMOB_API_KEY, PAYMOB_INTEGRATION_ID, PAYMOB_IFRAME_ID in backend/.env",
-        });
-      }
-
       const { amount, billing } = req.body || {};
-      const currency = String(process.env.PAYMOB_CURRENCY || "EGP").toUpperCase();
       const amountCents = Math.max(100, Math.round(Number(amount || 0) * 100));
 
       if (!Number.isFinite(amountCents) || amountCents <= 0) {
@@ -104,6 +120,19 @@ function registerPaymobRoutes(app) {
         });
       }
 
+      if (mockCheckoutEnabled()) {
+        console.warn("[Paymob] PAYMOB_MOCK_CHECKOUT active — skipping Paymob (dev/local only)");
+        return res.json({ ok: true, mock: true, orderId: `mock_${Date.now()}` });
+      }
+
+      if (!configured()) {
+        return res.status(503).json({
+          ok: false,
+          error: "Paymob is not configured. Set PAYMOB_API_KEY, PAYMOB_INTEGRATION_ID, PAYMOB_IFRAME_ID in backend/.env",
+        });
+      }
+
+      const currency = String(process.env.PAYMOB_CURRENCY || "EGP").toUpperCase();
       const billingData = {
         apartment: "NA",
         floor: "NA",
