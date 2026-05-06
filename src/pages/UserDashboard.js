@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { QRCodeCanvas } from 'qrcode.react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifier } from '../context/NotifierContext';
 import Navbar from '../components/Navbar';
@@ -9,12 +10,8 @@ import ParkingRulesSection from '../components/ParkingRulesSection';
 import AlexandriaParkingGrid from '../components/AlexandriaParkingGrid';
 import { LOT_NAME } from '../constants/alexandriaLot';
 import { PARKGO_PENDING_SLOT_KEY } from '../constants/pendingSlot';
-
-const PAYMENT_SUCCESS_TOAST_KEY = 'parkgo_payment_success_toast';
 import { formatEgp } from '../utils/formatEgp';
 import './Dashboard.css';
-import { QRCodeCanvas } from "qrcode.react";
-
 import { API_BASE } from '../config/apiBase';
 import { PARKGO_RESERVATIONS_CHANGED } from '../constants/parkgoEvents';
 import { fetchWithAuth } from '../utils/authFetch';
@@ -24,6 +21,7 @@ import {
   CHECK_IN_WARNING_LEAD_MINUTES,
 } from '../constants/checkInDeadline';
 import { tieredBookingTotalEgp, extraHourChargeEgp } from '../utils/parkingPricing';
+import { useParkgoPaymentSuccessToast } from '../hooks/useParkgoPaymentSuccessToast';
 
 /** Match backend overstay / extend extra-per-hour; set REACT_APP_OVERSTAY_HOURLY_RATE to override display. */
 const OVERSTAY_RATE_DISPLAY =
@@ -36,6 +34,8 @@ const UserDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast, confirm } = useNotifier();
+
+  useParkgoPaymentSuccessToast(toast);
 
   const [reservations, setReservations] = useState([]);
   const [history, setHistory] = useState([]);
@@ -77,16 +77,6 @@ const UserDashboard = () => {
       /* ignore */
     }
   };
-
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem(PAYMENT_SUCCESS_TOAST_KEY) !== '1') return;
-      sessionStorage.removeItem(PAYMENT_SUCCESS_TOAST_KEY);
-      toast('Payment successful! Your reservation is confirmed.', { variant: 'success', duration: 9000 });
-    } catch {
-      /* ignore */
-    }
-  }, [location.key, toast]);
 
   useEffect(() => {
     try {

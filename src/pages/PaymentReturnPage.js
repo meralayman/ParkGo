@@ -6,9 +6,9 @@ import { PARKGO_PENDING_SLOT_KEY } from "../constants/pendingSlot";
 
 import { API_BASE } from "../config/apiBase";
 import { fetchWithAuth } from "../utils/authFetch";
+import { PARKGO_PAYMENT_SUCCESS_TOAST_KEY } from "../constants/paymentToast";
 
 const STORAGE_KEY = "parkgo_pay_pending";
-const PAYMENT_SUCCESS_TOAST_KEY = "parkgo_payment_success_toast";
 
 /** Decode Paymob transaction redirect query params into a readable line */
 function paymobFailureHint(params) {
@@ -33,7 +33,7 @@ export default function PaymentReturnPage() {
 
   const navigateToDashboardWithSuccessToast = () => {
     try {
-      sessionStorage.setItem(PAYMENT_SUCCESS_TOAST_KEY, "1");
+      sessionStorage.setItem(PARKGO_PAYMENT_SUCCESS_TOAST_KEY, "1");
     } catch {
       /* ignore */
     }
